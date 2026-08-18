@@ -102,7 +102,8 @@ export type IncomeSourceType =
   | 'ENDORSE'
   | 'SPONSOR'
   | 'SERVICE'
-  | 'OTHER';
+  | 'OTHER'
+  | 'OPENING_BALANCE';
 
 export const DEFAULT_INCOME_CATEGORIES: string[] = [
   'KOMISI TIKTOK',
@@ -112,7 +113,7 @@ export const DEFAULT_INCOME_CATEGORIES: string[] = [
   'LAINNYA',
 ];
 
-export type TransactionType = 'INCOME' | 'EXPENSE';
+export type TransactionType = 'INCOME' | 'EXPENSE' | 'OPENING_BALANCE';
 export type TransactionStatus = 'ACTIVE' | 'VOID';
 export type TransactionSourceType =
   | 'TIKTOK_COMMISSION'
@@ -125,7 +126,8 @@ export type TransactionSourceType =
   | 'ATTENDANCE_BONUS'
   | 'PROFIT_SHARING'
   | 'MANUAL'
-  | 'OTHER';
+  | 'OTHER'
+  | 'OPENING_BALANCE';
 
 export type PaymentMethod = 'CASH' | 'TRANSFER' | 'EWALLET' | 'LAINNYA';
 

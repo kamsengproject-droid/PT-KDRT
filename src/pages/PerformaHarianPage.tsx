@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CurrencyInput } from '../components/CurrencyInput';
 import {
   TrendingUp,
   Plus,
@@ -65,18 +66,18 @@ export const PerformaHarianPage: React.FC<PerformaHarianPageProps> = ({ onBackTo
     accountId: string;
     accountName: string;
     scope: ScopeType;
-    gmv: number;
-    estimatedCommission: number;
-    realCommission: number;
+    gmv: number | '';
+    estimatedCommission: number | '';
+    realCommission: number | '';
     notes: string;
   }>({
     date: tanggalHariIni(),
     accountId: '',
     accountName: '',
     scope: 'SHARING',
-    gmv: 0,
-    estimatedCommission: 0,
-    realCommission: 0,
+    gmv: '',
+    estimatedCommission: '',
+    realCommission: '',
     notes: '',
   });
 
@@ -1066,12 +1067,10 @@ export const PerformaHarianPage: React.FC<PerformaHarianPageProps> = ({ onBackTo
                 </div>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">GMV Omzet (Rp) *</label>
-                  <input
-                    type="number"
-                    min={0}
+                  <CurrencyInput
                     required
                     value={formData.gmv}
-                    onChange={(e) => setFormData({ ...formData, gmv: Number(e.target.value) })}
+                    onChange={(val) => setFormData({ ...formData, gmv: val })}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold"
                   />
                 </div>
@@ -1080,22 +1079,18 @@ export const PerformaHarianPage: React.FC<PerformaHarianPageProps> = ({ onBackTo
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">Estimasi Komisi (Rp)</label>
-                  <input
-                    type="number"
-                    min={0}
+                  <CurrencyInput
                     value={formData.estimatedCommission}
-                    onChange={(e) => setFormData({ ...formData, estimatedCommission: Number(e.target.value) })}
+                    onChange={(val) => setFormData({ ...formData, estimatedCommission: val })}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-medium"
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-emerald-800 mb-1">Komisi Real / Uang Masuk (Rp) *</label>
-                  <input
-                    type="number"
-                    min={0}
+                  <CurrencyInput
                     required
                     value={formData.realCommission}
-                    onChange={(e) => setFormData({ ...formData, realCommission: Number(e.target.value) })}
+                    onChange={(val) => setFormData({ ...formData, realCommission: val })}
                     className="w-full rounded-xl border-2 border-emerald-400 bg-emerald-50/40 p-2.5 font-black text-emerald-800"
                   />
                 </div>

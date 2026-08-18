@@ -55,11 +55,11 @@ export const PenggajianPage: React.FC = () => {
 
   // Edit bonus & adjustment modal
   const [editPayrollModal, setEditPayrollModal] = useState<PayrollRecord | null>(null);
-  const [bonusInput, setBonusInput] = useState<number>(0);
+  const [bonusInput, setBonusInput] = useState<number | ''>('');
   const [bonusNoteInput, setBonusNoteInput] = useState<string>('');
-  const [additionInput, setAdditionInput] = useState<number>(0);
+  const [additionInput, setAdditionInput] = useState<number | ''>('');
   const [additionNoteInput, setAdditionNoteInput] = useState<string>('');
-  const [deductionInput, setDeductionInput] = useState<number>(0);
+  const [deductionInput, setDeductionInput] = useState<number | ''>('');
   const [deductionNoteInput, setDeductionNoteInput] = useState<string>('');
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -681,12 +681,9 @@ export const PenggajianPage: React.FC = () => {
                 <label className="block font-semibold text-zinc-700 mb-1">
                   Bonus Performa / Insentif (Rp)
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={50000}
+                <CurrencyInput
                   value={bonusInput}
-                  onChange={(e) => setBonusInput(Number(e.target.value))}
+                  onChange={(val) => setBonusInput(val)}
                   className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold text-zinc-900 focus:outline-emerald-600"
                 />
                 <input
@@ -703,12 +700,9 @@ export const PenggajianPage: React.FC = () => {
                 <label className="block font-semibold text-zinc-700 mb-1">
                   Penyesuaian Tambahan (+) (Rp)
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={50000}
+                <CurrencyInput
                   value={additionInput}
-                  onChange={(e) => setAdditionInput(Number(e.target.value))}
+                  onChange={(val) => setAdditionInput(val)}
                   className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold text-emerald-700 focus:outline-emerald-600"
                 />
                 <input
@@ -725,12 +719,9 @@ export const PenggajianPage: React.FC = () => {
                 <label className="block font-semibold text-zinc-700 mb-1">
                   Potongan Manual (−) (Rp)
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={50000}
+                <CurrencyInput
                   value={deductionInput}
-                  onChange={(e) => setDeductionInput(Number(e.target.value))}
+                  onChange={(val) => setDeductionInput(val)}
                   className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold text-rose-700 focus:outline-rose-600"
                 />
                 <input

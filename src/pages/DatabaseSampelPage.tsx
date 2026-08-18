@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CurrencyInput } from '../components/CurrencyInput';
 import {
   Package,
   Plus,
@@ -113,10 +114,10 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productFormData, setProductFormData] = useState<{
     productName: string;
-    productPrice: number;
+    productPrice: number | '';
     productUrl: string;
     productImage: string;
-    commissionRate: number;
+    commissionRate: number | '';
     accountIds: string[];
     category: string;
     scope: ScopeType;
@@ -124,7 +125,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     notes: string;
   }>({
     productName: '',
-    productPrice: 0,
+    productPrice: '',
     productUrl: '',
     productImage: '',
     commissionRate: 10,
@@ -143,14 +144,14 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     productName: string;
     productUrl: string;
     productImage: string;
-    samplePrice: number;
+    samplePrice: number | '';
     purchaseDate: string;
-    quantity: number;
-    totalCost: number;
+    quantity: number | '';
+    totalCost: number | '';
     status: SampleStatus;
     accountId: string;
     employeeId: string;
-    targetContent: number;
+    targetContent: number | '';
     completedContent: number;
     unitContent: string;
     scope: ScopeType;
@@ -162,14 +163,14 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     productName: '',
     productUrl: '',
     productImage: '',
-    samplePrice: 0,
+    samplePrice: '',
     purchaseDate: tanggalHariIni(),
-    quantity: 1,
-    totalCost: 0,
+    quantity: '',
+    totalCost: '',
     status: 'DIPESAN',
     accountId: '',
     employeeId: '',
-    targetContent: 3,
+    targetContent: '',
     completedContent: 0,
     unitContent: 'VT',
     scope: isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI'),
@@ -370,7 +371,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     setEditingProduct(prod);
     setProductFormData({
       productName: prod.productName,
-      productPrice: prod.productPrice || 0,
+      productPrice: prod.productPrice || '',
       productUrl: prod.productUrl || '',
       productImage: prod.productImage || '',
       commissionRate: prod.commissionRate || 10,
@@ -396,12 +397,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       productImage: '',
       samplePrice: 0,
       purchaseDate: tanggalHariIni(),
-      quantity: 1,
-      totalCost: 0,
+      quantity: '',
+      totalCost: '',
       status: 'DIPESAN',
       accountId: defaultAcc?.id || '',
       employeeId: defaultEmp?.employeeId || defaultEmp?.id || '',
-      targetContent: 3,
+      targetContent: '',
       completedContent: 0,
       unitContent: 'VT',
       scope: isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : (defaultAcc?.scope || 'PRIBADI')),
@@ -426,12 +427,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       productImage: prod.productImage || '',
       samplePrice: price,
       purchaseDate: tanggalHariIni(),
-      quantity: 1,
+      quantity: '',
       totalCost: price,
       status: 'DIPESAN',
       accountId: defaultAcc?.id || '',
       employeeId: defaultEmp?.employeeId || defaultEmp?.id || '',
-      targetContent: 3,
+      targetContent: '',
       completedContent: 0,
       unitContent: 'VT',
       scope: prod.scope || 'PRIBADI',
@@ -507,10 +508,10 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       const name = userProfile?.name || currentUser?.displayName || 'User';
 
       if (editingProduct?.id) {
-        await updateProduct(editingProduct.id, editingProduct, productFormData, null, uid, name);
+        await updateProduct(editingProduct.id, editingProduct, { ...productFormData, productPrice: Number(productFormData.productPrice) || 0, commissionRate: Number(productFormData.commissionRate) || 0 }, null, uid, name);
         setSuccessToast(`Master produk "${productFormData.productName}" berhasil diperbarui.`);
       } else {
-        await createProduct(productFormData, null, uid, name);
+        await createProduct({ ...productFormData, productPrice: Number(productFormData.productPrice) || 0, commissionRate: Number(productFormData.commissionRate) || 0 }, null, uid, name);
         setSuccessToast(`Master produk "${productFormData.productName}" berhasil ditambahkan.`);
       }
       setIsProductModalOpen(false);
@@ -1302,22 +1303,18 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-zinc-700 mb-1">Harga Produk (Rp)</label>
-                    <input
-                      type="number"
-                      min={0}
+                    <CurrencyInput
                       value={productFormData.productPrice}
-                      onChange={(e) => setProductFormData({ ...productFormData, productPrice: Number(e.target.value) })}
+                      onChange={(val) => setProductFormData({ ...productFormData, productPrice: val })}
                       className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold"
                     />
                   </div>
                   <div>
                     <label className="block font-bold text-zinc-700 mb-1">Komisi Afiliasi (%)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
+                    <CurrencyInput
+                      prefix=""
                       value={productFormData.commissionRate}
-                      onChange={(e) => setProductFormData({ ...productFormData, commissionRate: Number(e.target.value) })}
+                      onChange={(val) => setProductFormData({ ...productFormData, commissionRate: val })}
                       className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold text-indigo-700"
                     />
                   </div>
@@ -1470,16 +1467,14 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 {!isEmployee && (
                   <div>
                     <label className="block font-bold text-zinc-700 mb-1">Harga Sampel</label>
-                    <input
-                      type="number"
-                      min={0}
+                    <CurrencyInput
                       value={sampleFormData.samplePrice}
-                      onChange={(e) => {
-                        const price = Number(e.target.value);
+                      onChange={(val) => {
+                        const price = Number(val) || 0;
                         setSampleFormData({
                           ...sampleFormData,
-                          samplePrice: price,
-                          totalCost: price * (sampleFormData.quantity || 1),
+                          samplePrice: val,
+                          totalCost: price * (Number(sampleFormData.quantity) || 1),
                         });
                       }}
                       className="w-full rounded-xl border border-zinc-300 p-2 font-bold"
@@ -1488,16 +1483,15 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 )}
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">Qty</label>
-                  <input
-                    type="number"
-                    min={1}
+                  <CurrencyInput
+                    prefix=""
                     value={sampleFormData.quantity}
-                    onChange={(e) => {
-                      const qty = Math.max(1, Number(e.target.value));
+                    onChange={(val) => {
+                      const qty = Math.max(1, Number(val) || 1);
                       setSampleFormData({
                         ...sampleFormData,
-                        quantity: qty,
-                        totalCost: (sampleFormData.samplePrice || 0) * qty,
+                        quantity: val,
+                        totalCost: (Number(sampleFormData.samplePrice) || 0) * qty,
                       });
                     }}
                     className="w-full rounded-xl border border-zinc-300 p-2 font-bold text-center"
@@ -1506,11 +1500,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 {!isEmployee && (
                   <div>
                     <label className="block font-bold text-zinc-700 mb-1">Total Biaya (Rp)</label>
-                    <input
-                      type="number"
-                      min={0}
+                    <CurrencyInput
                       value={sampleFormData.totalCost}
-                      onChange={(e) => setSampleFormData({ ...sampleFormData, totalCost: Number(e.target.value) })}
+                      onChange={(val) => setSampleFormData({ ...sampleFormData, totalCost: val })}
                       className="w-full rounded-xl border border-zinc-300 p-2 font-black text-rose-700"
                     />
                   </div>
@@ -1530,11 +1522,10 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 </div>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">Target VT / Output Konten</label>
-                  <input
-                    type="number"
-                    min={1}
+                  <CurrencyInput
+                    prefix=""
                     value={sampleFormData.targetContent}
-                    onChange={(e) => setSampleFormData({ ...sampleFormData, targetContent: Number(e.target.value) })}
+                    onChange={(val) => setSampleFormData({ ...sampleFormData, targetContent: val })}
                     className="w-full rounded-xl border border-zinc-300 p-2 font-bold text-orange-700"
                   />
                 </div>

@@ -67,7 +67,7 @@ export const KaryawanPage: React.FC<KaryawanPageProps> = ({
     position: string;
     appRole: UserRole;
     scope: ScopeType;
-    baseSalary: number;
+    baseSalary: number | '';
     startDate: string;
     active: boolean;
     email: string;

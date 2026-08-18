@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
+  Wallet, CurrencyInput } from '../components/CurrencyInput';
+import {
   DollarSign,
   TrendingUp,
   TrendingDown,
@@ -92,7 +94,7 @@ export const ArusKasPage: React.FC = () => {
     gmv: number;
     estimatedCommission: number;
     realCommission: number;
-    amount: number;
+    amount: number | '';
     paymentMethod: PaymentMethod;
     description: string;
     notes: string;
@@ -103,10 +105,10 @@ export const ArusKasPage: React.FC = () => {
     category: 'KOMISI TIKTOK',
     sourceType: 'TIKTOK_COMMISSION',
     accountName: '',
-    gmv: 0,
-    estimatedCommission: 0,
-    realCommission: 0,
-    amount: 0,
+    gmv: '',
+    estimatedCommission: '',
+    realCommission: '',
+    amount: '',
     paymentMethod: 'TRANSFER',
     description: '',
     notes: '',
@@ -127,7 +129,7 @@ export const ArusKasPage: React.FC = () => {
     date: tanggalHariIni(),
     scope: 'SHARING',
     category: 'OPERASIONAL',
-    amount: 0,
+    amount: '',
     paymentMethod: 'TRANSFER',
     description: '',
     notes: '',
@@ -241,17 +243,34 @@ export const ArusKasPage: React.FC = () => {
 
   const totalUangMasuk = useMemo(() => {
     return activeTxs
-      .filter((tx) => tx.type === 'INCOME')
+      .filter((tx) => tx.type === 'INCOME' && tx.sourceType !== 'OPENING_BALANCE')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   }, [activeTxs]);
 
+  const saldoAwal = useMemo(() => {
+    let balance = 0;
+    transactions.forEach(tx => {
+      if ((tx.status || 'ACTIVE') !== 'ACTIVE') return;
+      // Saldo awal = semua opening balance + cashflow SEBELUM periode ini
+      if (tx.date < dateRange.start || tx.sourceType === 'OPENING_BALANCE') {
+        // Jika opening balance tapi setelah/di dalam periode ini, tetap anggap saldo awal
+        // Jika transaksi biasa tapi sebelum periode, masuk ke carry over saldo awal
+        if (tx.type === 'INCOME') balance += Number(tx.amount) || 0;
+        if (tx.type === 'EXPENSE') balance -= Number(tx.amount) || 0;
+      }
+    });
+    return balance;
+  }, [transactions, dateRange.start]);
+  
   const totalUangKeluar = useMemo(() => {
     return activeTxs
       .filter((tx) => tx.type === 'EXPENSE')
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   }, [activeTxs]);
 
-  const saldoKasBersih = totalUangMasuk - totalUangKeluar;
+  const saldoBerjalan = saldoAwal + totalUangMasuk - totalUangKeluar;
+
+
 
   // Breakdown GMV (Hanya metrik performa afiliasi, bukan uang masuk kas)
   const totalGmvRef = useMemo(() => {
@@ -296,10 +315,10 @@ export const ArusKasPage: React.FC = () => {
       category: 'KOMISI TIKTOK',
       sourceType: 'TIKTOK_COMMISSION',
       accountName: '',
-      gmv: 0,
-      estimatedCommission: 0,
-      realCommission: 0,
-      amount: 0,
+      gmv: '',
+      estimatedCommission: '',
+      realCommission: '',
+      amount: '',
       paymentMethod: 'TRANSFER',
       description: '',
       notes: '',
@@ -313,7 +332,7 @@ export const ArusKasPage: React.FC = () => {
       date: tanggalHariIni(),
       scope: selectedScope === 'PRIBADI' ? 'PRIBADI' : 'SHARING',
       category: 'OPERASIONAL',
-      amount: 0,
+      amount: '',
       paymentMethod: 'TRANSFER',
       description: '',
       notes: '',
@@ -746,13 +765,13 @@ export const ArusKasPage: React.FC = () => {
             </span>
             <DollarSign className="h-4 w-4 text-emerald-400" />
           </div>
-          <p className={`text-2xl font-extrabold mt-2 ${saldoKasBersih >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {formatRupiah(saldoKasBersih)}
+          <p className={`text-2xl font-extrabold mt-2 ${saldoBerjalan >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {formatRupiah(saldoBerjalan)}
           </p>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 font-medium mt-1">
             <span>Formula: Masuk - Keluar</span>
-            <span className={`font-bold ${saldoKasBersih >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {saldoKasBersih >= 0 ? 'SURPLUS' : 'DEFISIT'}
+            <span className={`font-bold ${saldoBerjalan >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {saldoBerjalan >= 0 ? 'SURPLUS' : 'DEFISIT'}
             </span>
           </div>
         </div>
@@ -1141,23 +1160,19 @@ export const ArusKasPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-zinc-700 mb-1">GMV Penjualan (Metrik)</label>
-                      <input
-                        type="number"
-                        min={0}
+                      <CurrencyInput
                         placeholder="Rp 0"
-                        value={incomeForm.gmv}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, gmv: Number(e.target.value) })}
+                        value={incomeForm.gmv || ''}
+                        onChange={(val) => setIncomeForm({ ...incomeForm, gmv: val })}
                         className="w-full rounded-xl border border-zinc-300 bg-white p-2 font-medium"
                       />
                     </div>
                     <div>
                       <label className="block font-bold text-zinc-700 mb-1">Estimasi Komisi (Metrik)</label>
-                      <input
-                        type="number"
-                        min={0}
+                      <CurrencyInput
                         placeholder="Rp 0"
-                        value={incomeForm.estimatedCommission}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, estimatedCommission: Number(e.target.value) })}
+                        value={incomeForm.estimatedCommission || ''}
+                        onChange={(val) => setIncomeForm({ ...incomeForm, estimatedCommission: val })}
                         className="w-full rounded-xl border border-zinc-300 bg-white p-2 font-medium"
                       />
                     </div>
@@ -1184,12 +1199,10 @@ export const ArusKasPage: React.FC = () => {
               ) : (
                 <div>
                   <label className="block font-extrabold text-zinc-800 mb-1">Nominal Uang Masuk (Rp) *</label>
-                  <input
-                    type="number"
-                    min={1}
+                  <CurrencyInput
                     required
-                    value={incomeForm.amount}
-                    onChange={(e) => setIncomeForm({ ...incomeForm, amount: Number(e.target.value) })}
+                    value={incomeForm.amount || ''}
+                    onChange={(val) => setIncomeForm({ ...incomeForm, amount: val })}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-extrabold text-emerald-700 text-base"
                   />
                 </div>

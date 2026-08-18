@@ -38,7 +38,7 @@ export const PengeluaranPage: React.FC = () => {
     date: tanggalHariIni(),
     category: 'OPERASIONAL',
     scope: 'SHARING',
-    amount: 0,
+    amount: '',
     description: '',
     receiptUrl: '',
   });
@@ -65,7 +65,7 @@ export const PengeluaranPage: React.FC = () => {
       date: tanggalHariIni(),
       category: 'OPERASIONAL',
       scope: 'SHARING',
-      amount: 0,
+      amount: '',
       description: '',
       receiptUrl: '',
     });
@@ -329,12 +329,10 @@ export const PengeluaranPage: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-zinc-700 mb-1">Nominal (Rp)</label>
-                <input
-                  type="number"
-                  min={0}
+                <CurrencyInput
                   required
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                  onChange={(val) => setFormData({ ...formData, amount: val })}
                   className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold text-rose-600"
                 />
               </div>

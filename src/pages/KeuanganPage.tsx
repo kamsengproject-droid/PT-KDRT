@@ -11,11 +11,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { ArusKasPage } from './ArusKasPage';
 import { PengeluaranPage } from './PengeluaranPage';
+import { SaldoAwalPage } from './SaldoAwalPage';
 import { RekonsiliasiKas } from '../components/finance/RekonsiliasiKas';
 
 interface KeuanganPageProps {
   onBackToPortal?: () => void;
-  defaultTab?: 'ARUS_KAS' | 'PENGELUARAN' | 'REKONSILIASI';
+  defaultTab?: 'ARUS_KAS' | 'PENGELUARAN' | 'REKONSILIASI' | 'SALDO_AWAL';
 }
 
 export const KeuanganPage: React.FC<KeuanganPageProps> = ({
@@ -23,7 +24,7 @@ export const KeuanganPage: React.FC<KeuanganPageProps> = ({
   defaultTab = 'ARUS_KAS',
 }) => {
   const { role } = useAuth();
-  const [activeTab, setActiveTab] = useState<'ARUS_KAS' | 'PENGELUARAN' | 'REKONSILIASI'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'ARUS_KAS' | 'PENGELUARAN' | 'REKONSILIASI' | 'SALDO_AWAL'>(defaultTab);
 
   return (
     <div className="space-y-6 pb-12">
@@ -43,7 +44,7 @@ export const KeuanganPage: React.FC<KeuanganPageProps> = ({
           <span className="font-bold text-emerald-600">
             {activeTab === 'ARUS_KAS'
               ? 'BUKU KAS & CASHFLOW'
-              : activeTab === 'REKONSILIASI'
+              : activeTab === 'SALDO_AWAL' ? 'SALDO AWAL & PENYESUAIAN' : activeTab === 'REKONSILIASI'
               ? 'REKONSILIASI KAS'
               : 'PENGELUARAN OPERASIONAL'}
           </span>
@@ -74,6 +75,20 @@ export const KeuanganPage: React.FC<KeuanganPageProps> = ({
           <span>[ Buku Kas & Cashflow Master ]</span>
         </button>
 
+        
+        {role === 'OWNER' && (
+          <button
+            onClick={() => setActiveTab('SALDO_AWAL')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+              activeTab === 'SALDO_AWAL'
+                ? 'bg-zinc-900 text-white shadow-xs'
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            <Wallet className="h-4 w-4 text-indigo-400" />
+            <span>[ Saldo Awal ]</span>
+          </button>
+        )}
         {role === 'OWNER' && (
           <button
             onClick={() => setActiveTab('REKONSILIASI')}
@@ -102,8 +117,10 @@ export const KeuanganPage: React.FC<KeuanganPageProps> = ({
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'ARUS_KAS' ? (
+            {activeTab === 'ARUS_KAS' ? (
         <ArusKasPage />
+      ) : activeTab === 'SALDO_AWAL' ? (
+        <SaldoAwalPage />
       ) : activeTab === 'REKONSILIASI' ? (
         <RekonsiliasiKas />
       ) : (
