@@ -1,0 +1,80 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isAuthenticated() && request.auth.token.role == 'OWNER';
+    }
+
+    function isManager() {
+      return isAuthenticated() && (request.auth.token.role == 'MANAGER' || isOwner());
+    }
+
+    function isInvestor() {
+      return isAuthenticated() && request.auth.token.role == 'INVESTOR';
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && (request.auth.token.role == 'EMPLOYEE' || isManager() || isOwner());
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 10 * 1024 * 1024;
+    }
+
+    function isImageOrDoc() {
+      return (request.resource.contentType.matches('image/.*') || 
+              request.resource.contentType == 'application/pdf') &&
+             request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // 1. Attendance Selfies (Strictly internal & individual - Investor FORBIDDEN)
+    match /attendance/{employeeId}/{allPaths=**} {
+      allow read: if isOwner() || isManager() || (isAuthenticated() && request.auth.uid == employeeId);
+      allow write: if (isOwner() || isManager() || (isAuthenticated() && request.auth.uid == employeeId)) && isImage();
+    }
+
+    match /attendance/{allPaths=**} {
+      allow read: if isOwner() || isManager() || isEmployee();
+      allow write: if (isOwner() || isManager() || isEmployee()) && isImage();
+    }
+
+    // 2. Receipts & Financial Invoices
+    match /transactions/{allPaths=**} {
+      allow read: if isOwner() || isManager() || isInvestor();
+      allow write: if (isOwner() || isManager()) && isImageOrDoc();
+    }
+
+    // 3. Investor Withdrawal Proofs
+    match /withdrawals/{allPaths=**} {
+      allow read: if isOwner() || isManager() || isInvestor();
+      allow write: if isOwner() && isImageOrDoc();
+    }
+
+    // 4. Products, Samples, Inventory Photos
+    match /products/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if (isOwner() || isManager()) && isImage();
+    }
+
+    match /samples/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if (isOwner() || isManager()) && isImage();
+    }
+
+    match /inventory/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if (isOwner() || isManager() || isEmployee()) && isImage();
+    }
+
+    // Default Fallback: Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

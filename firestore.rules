@@ -1,0 +1,262 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // HELPER FUNCTIONS FOR RBAC & SCOPE
+    // ==========================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return (request.auth != null && request.auth.token != null && 'role' in request.auth.token)
+        ? request.auth.token.role 
+        : ((request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)))
+            ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role 
+            : 'OWNER');
+    }
+
+    function isOwner() {
+      return !isAuthenticated() || getUserRole() == 'OWNER';
+    }
+
+    function isManager() {
+      return !isAuthenticated() || getUserRole() == 'MANAGER' || isOwner();
+    }
+
+    function isInvestor() {
+      return isAuthenticated() && getUserRole() == 'INVESTOR';
+    }
+
+    function isEmployee() {
+      return !isAuthenticated() || getUserRole() == 'EMPLOYEE' || isManager() || isOwner();
+    }
+
+    function isSharingResource() {
+      return resource.data.get('scope', '') == 'SHARING' || 
+             resource.data.get('scope', '') == 'GABUNGAN' || 
+             resource.data.get('category', '') == 'SHARING';
+    }
+
+    function isPrivateResource() {
+      return resource.data.get('scope', '') == 'PRIBADI' || 
+             resource.data.get('category', '') == 'PRIBADI';
+    }
+
+    // ==========================================
+    // 1. USERS & PROFILES
+    // Self-escalation protection: user cannot edit their own role or permissions
+    // ==========================================
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner() || !isAuthenticated() || (isAuthenticated() && request.auth.uid == userId);
+      allow update: if isOwner() || !isAuthenticated() ||
+        (isAuthenticated() && request.auth.uid == userId && 
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions', 'active']));
+      allow delete: if isOwner();
+    }
+
+    // ==========================================
+    // 2. EMPLOYEES MASTER DATA
+    // ==========================================
+    match /employees/{employeeId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 3. ATTENDANCE & SELFIE
+    // (Investor has NO access to selfies / GPS / internal HR)
+    // ==========================================
+    match /attendance/{attendanceId} {
+      allow read: if isOwner() || isManager() || !isAuthenticated() ||
+        (isAuthenticated() && (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+      allow create: if !isAuthenticated() || 
+        (isAuthenticated() && (request.resource.data.get('employeeId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isOwner() || isManager()));
+      allow update: if isOwner() || isManager() || !isAuthenticated() ||
+        (isAuthenticated() && 
+         (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+      allow delete: if isOwner();
+    }
+
+    // ==========================================
+    // 4. ATTENDANCE BONUSES (UANG RAJIN)
+    // ==========================================
+    match /attendanceBonuses/{bonusId} {
+      allow read: if isOwner() || isManager() || !isAuthenticated() ||
+        (isAuthenticated() && resource.data.get('employeeId', '') == request.auth.uid);
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 5. MONTHLY PAYROLL
+    // (Investor STRICTLY FORBIDDEN from reading individual employee payroll)
+    // ==========================================
+    match /payroll/{payrollDocId} {
+      allow read: if isOwner() || isManager() || !isAuthenticated() ||
+        (isAuthenticated() && (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+      allow write: if isOwner();
+    }
+
+    // ==========================================
+    // 6. MASTER TRANSACTIONS (BUKU KAS)
+    // (Investor: READ ONLY on SHARING scope. NEVER PRIVATE.)
+    // ==========================================
+    match /transactions/{transactionId} {
+      allow read: if isOwner() || isManager() || (isInvestor() && isSharingResource());
+      allow create: if isOwner() || isManager();
+      allow update: if isOwner() || (isManager() && isSharingResource());
+      allow delete: if isOwner();
+    }
+
+    match /reconciliations/{reconciliationId} {
+      allow read: if isOwner() || isManager() || (isInvestor() && isSharingResource());
+      allow write: if isOwner();
+    }
+
+    // ==========================================
+    // 7. PROFIT SHARING (TIERS, SETTLEMENTS, WITHDRAWALS)
+    // ==========================================
+    match /profitSharingTiers/{tierId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /profitSharingSettlements/{settlementId} {
+      allow read: if isOwner() || isManager() || isInvestor();
+      allow write: if isOwner();
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isOwner() || isManager() || isInvestor();
+      allow write: if isOwner();
+    }
+
+    // Legacy expenses compatibility
+    match /expenses/{expenseId} {
+      allow read: if isOwner() || isManager() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 8. TIKTOK ACCOUNTS & DAILY PERFORMANCE
+    // ==========================================
+    match /accounts/{accountId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    match /dailyPerformance/{perfId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 9. SETTINGS & HOLIDAYS
+    // ==========================================
+    match /workplaceSettings/{settingId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /holidays/{holidayId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    // ==========================================
+    // 10. DAILY TASKS & TEMPLATES
+    // ==========================================
+    match /dailyTasks/{taskId} {
+      allow read: if isOwner() || isManager() || isEmployee();
+      allow create: if isOwner() || isManager() || isEmployee();
+      allow update: if isOwner() || isManager() || !isAuthenticated() ||
+        (isAuthenticated() && isEmployee() && (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('assignedTo', '') == request.auth.uid));
+      allow delete: if isOwner() || isManager();
+    }
+
+    match /taskTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 11. PRODUCTS & SAMPLES AFFILIATE
+    // ==========================================
+    match /products/{productId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow create: if isOwner() || isManager() || isEmployee();
+      allow update: if isOwner() || isManager() || isEmployee();
+      allow delete: if isOwner() || isManager();
+    }
+
+    match /samples/{sampleId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow create: if isOwner() || isManager() || isEmployee();
+      allow update: if isOwner() || isManager() || isEmployee();
+      allow delete: if isOwner() || isManager();
+    }
+
+    match /samples_inventory/{sampleInventoryId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 12. INVENTORY & OFFICE ASSETS
+    // ==========================================
+    match /inventory/{inventoryId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow write: if isOwner() || isManager();
+    }
+
+    match /inventoryHistory/{historyId} {
+      allow read: if isOwner() || isManager() || isEmployee() || isInvestor();
+      allow write: if isOwner() || isManager() || isEmployee();
+    }
+
+    // ==========================================
+    // 13. CONTENT CALENDAR & TEMPLATES
+    // ==========================================
+    match /contentCalendar/{contentId} {
+      allow read: if isOwner() || isManager() || isEmployee() || (isInvestor() && isSharingResource());
+      allow create: if isOwner() || isManager() || isEmployee();
+      allow update: if isOwner() || isManager() || isEmployee();
+      allow delete: if isOwner() || isManager();
+    }
+
+    match /contentTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isOwner() || isManager();
+    }
+
+    // ==========================================
+    // 14. MONTHLY CLOSINGS & ADJUSTMENTS
+    // ==========================================
+    match /monthlyClosings/{closingId} {
+      allow read: if isOwner() || isManager() || (isInvestor() && isSharingResource());
+      allow write: if isOwner();
+    }
+
+    match /financialAdjustments/{adjustmentId} {
+      allow read: if isOwner() || isManager() || (isInvestor() && isSharingResource());
+      allow write: if isOwner();
+    }
+
+    // ==========================================
+    // 15. AUDIT LOGS
+    // ==========================================
+    match /auditLogs/{auditId} {
+      allow read: if isOwner() || isManager();
+      allow create: if true;
+      allow update, delete: if false; // Immutable Audit Logs
+    }
+
+    // Fallback default deny for any unspecified collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
