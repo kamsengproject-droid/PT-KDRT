@@ -67,14 +67,21 @@ export const RekonsiliasiKas: React.FC = () => {
   }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active, selectedScope]);
 
   // Hitung saldo sistem kumulatif sampai tanggal/bulan yang dipilih
-  const filteredTxs = transactions.filter((t) => t.date <= reconcileDate);
+  const filteredTxs = transactions.filter((t) => t.date <= reconcileDate && (t.status || 'ACTIVE') === 'ACTIVE');
+  
+  const openingBalance = filteredTxs
+    .filter((t) => t.sourceType === 'OPENING_BALANCE')
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    
   const totalIncome = filteredTxs
-    .filter((t) => t.type === 'INCOME')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'INCOME' && t.sourceType !== 'OPENING_BALANCE')
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    
   const totalExpense = filteredTxs
     .filter((t) => t.type === 'EXPENSE')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const systemCalculatedBalance = totalIncome - totalExpense;
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    
+  const systemCalculatedBalance = openingBalance + totalIncome - totalExpense;
 
   const currentDifference = actualBalanceInput - systemCalculatedBalance;
 
