@@ -51,8 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shrink-0">
-      {/* Left: Mobile Toggle & Logo "KANTOR PT.KDRT" */}
-      <div className="flex items-center gap-3">
+      {/* Left: Mobile Toggle & Horizontal Logo [ KD ] KANTOR PT.KDRT [ ROLE ] */}
+      <div className="flex items-center gap-2.5 sm:gap-3">
         <button
           onClick={onToggleSidebar}
           className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden transition-colors"
@@ -63,21 +63,26 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           onClick={() => setActiveMenu('portal')}
-          className="flex items-center gap-2 text-left group"
+          className="flex items-center gap-2 text-left group shrink-0"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500 text-white font-black text-xs shadow-2xs group-hover:bg-orange-600 transition-colors">
+          <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-orange-500 text-white font-black text-xs shadow-2xs group-hover:bg-orange-600 transition-colors shrink-0">
             KD
           </span>
-          <div className="flex flex-col">
-            <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight group-hover:text-orange-600 transition-colors">
-              KANTOR PT.KDRT
-            </span>
-          </div>
+          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight group-hover:text-orange-600 transition-colors whitespace-nowrap">
+            KANTOR PT.KDRT
+          </span>
+          <span
+            className={`hidden xs:inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${getRoleBadgeClass(
+              role
+            )}`}
+          >
+            {role}
+          </span>
         </button>
       </div>
 
       {/* Right: Nama User, Role, Status Firebase Online, Avatar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Status Firebase Online */}
         <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -85,18 +90,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* User Info Display */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 pr-2.5 text-xs font-semibold text-slate-800 shadow-2xs">
+        <button
+          onClick={() => setActiveMenu(role === 'EMPLOYEE' ? 'data-saya' : 'profil-saya')}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 pr-2.5 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-slate-100 transition-colors cursor-pointer text-left"
+          title="Buka Profil Saya"
+        >
           {/* Avatar */}
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shadow-2xs">
-            {getAvatarInitials(userProfile?.name)}
-          </div>
+          {userProfile?.photoUrl ? (
+            <img
+              src={userProfile.photoUrl}
+              alt={userProfile?.name || 'User'}
+              className="h-7 w-7 rounded-lg object-cover border border-slate-300 shadow-2xs"
+            />
+          ) : (
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shadow-2xs">
+              {getAvatarInitials(userProfile?.name)}
+            </div>
+          )}
 
           <div className="hidden md:flex flex-col text-left">
             <span className="text-xs font-bold text-slate-900 truncate max-w-[120px]">
               {userProfile?.name || 'User'}
             </span>
             <span className="text-[10px] font-semibold text-slate-500 uppercase">
-              {role}
+              {role === 'EMPLOYEE' ? 'Talent' : role}
             </span>
           </div>
 
@@ -107,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {role}
           </span>
-        </div>
+        </button>
 
         {/* Logout Button */}
         <button

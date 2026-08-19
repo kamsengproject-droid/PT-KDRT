@@ -8,12 +8,24 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  setDoc,
   where,
   orderBy,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, handleFirestoreError, OperationType } from '../firebase';
 import { Employee, ScopeType } from '../types';
 import { catatAuditLog } from './auditService';
+
+function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
 
 export function subscribeEmployees(
   scope?: ScopeType,
@@ -205,3 +217,116 @@ export async function toggleStatusKaryawan(
     handleFirestoreError(error, OperationType.UPDATE, `employees/${id}`);
   }
 }
+
+/**
+ * Upload foto profil karyawan ke Firebase Storage
+ */
+export async function uploadEmployeePhoto(
+  employeeId: string,
+  file: File
+): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `employeePhotos/${employeeId}/${timestamp}_${safeName}`;
+    const storageRef = ref(storage, storagePath);
+
+    await uploadBytes(storageRef, file);
+    const downloadUrl = await getDownloadURL(storageRef);
+    return downloadUrl;
+  } catch (err) {
+    console.error('Gagal upload foto karyawan:', err);
+    throw err;
+  }
+}
+
+/**
+ * Update Profil Mandiri Karyawan (Foto, Nama Tampilan, Nama Panggilan, Telepon)
+ */
+export async function updateEmployeeOwnProfile(
+  employeeId: string,
+  uid: string,
+  data: {
+    name?: string;
+    nickname?: string;
+    phone?: string;
+    photoUrl?: string;
+  }
+): Promise<void> {
+  try {
+    const payload = cleanUndefined({
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+
+    // 1. Update document in employees collection if employeeId exists
+    if (employeeId) {
+      const empRef = doc(db, 'employees', employeeId);
+      await updateDoc(empRef, payload);
+    }
+
+    // 2. Update user profile document in users collection
+    if (uid) {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, payload, { merge: true });
+    }
+
+    await catatAuditLog(
+      uid,
+      data.name || 'Karyawan',
+      'EDIT_PROFIL_MANDIRI',
+      data.name || employeeId,
+      `Karyawan memperbarui profil mandiri (Nama/Panggilan/Telepon/Foto)`
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `employees/${employeeId}`);
+    throw error;
+  }
+}
+
+/**
+ * Update Rekening Bank Mandiri Karyawan
+ */
+export async function updateEmployeeBankAccount(
+  employeeId: string,
+  uid: string,
+  currentUserName: string,
+  bankData: {
+    bankName: string;
+    bankAccountNumber: string;
+    bankAccountHolder: string;
+  }
+): Promise<void> {
+  try {
+    const payload = cleanUndefined({
+      bankName: bankData.bankName.trim(),
+      bankAccountNumber: bankData.bankAccountNumber.trim(),
+      bankAccountHolder: bankData.bankAccountHolder.trim(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // 1. Update in employees collection
+    if (employeeId) {
+      const empRef = doc(db, 'employees', employeeId);
+      await updateDoc(empRef, payload);
+    }
+
+    // 2. Update in users collection
+    if (uid) {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, payload, { merge: true });
+    }
+
+    await catatAuditLog(
+      uid,
+      currentUserName,
+      'EDIT_REKENING_BANK',
+      bankData.bankName,
+      `Karyawan memperbarui data rekening bank: ${bankData.bankName} - ${bankData.bankAccountNumber} a/n ${bankData.bankAccountHolder}`
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `employees/${employeeId}`);
+    throw error;
+  }
+}
+

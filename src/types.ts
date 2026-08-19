@@ -19,10 +19,16 @@ export interface UserPermissions {
 export interface UserProfile {
   uid: string;
   name: string;
+  nickname?: string;
   email: string;
+  phone?: string;
+  photoUrl?: string;
   role: UserRole;
   active: boolean;
   employeeId?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
   permissions: UserPermissions;
   createdAt?: any;
   updatedAt?: any;
@@ -242,6 +248,9 @@ export interface Employee {
   phone?: string;
   notes?: string;
   photoUrl?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
   permissions?: {
     canViewAttendance?: boolean;
     canManageOwnProfile?: boolean;
