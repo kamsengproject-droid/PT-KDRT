@@ -24,7 +24,7 @@ import {
 } from '../types';
 import {
   createFinancialTransaction,
-  voidTransaction,
+  deleteTransaction,
   checkDuplicateTransaction,
 } from './transactionService';
 import { catatAuditLog } from './auditService';
@@ -819,7 +819,7 @@ export async function voidInvestorWithdrawal(
 
     // 1. VOID the corresponding cash transaction in 'transactions'
     if (withData.transactionId) {
-      await voidTransaction(
+      await deleteTransaction(
         withData.transactionId,
         {
           type: 'EXPENSE',

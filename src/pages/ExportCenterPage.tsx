@@ -138,7 +138,10 @@ export const ExportCenterPage: React.FC<ExportCenterPageProps> = ({ userProfile:
   }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active]);
 
   // Filter Helper
-  const matchFilter = (item: any) => {
+    const matchFilter = (item: any) => {
+    // Exclude void records
+    if (item.status === 'VOID') return false;
+
     // Investor constraint
     if (isInvestor) {
       if (item.scope && item.scope !== 'SHARING') return false;

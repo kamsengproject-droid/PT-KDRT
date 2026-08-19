@@ -16,6 +16,7 @@ import { DashboardSharingPage } from './pages/DashboardSharingPage';
 import { DashboardPribadiPage } from './pages/DashboardPribadiPage';
 import { AkunPage } from './pages/AkunPage';
 import { PerformaHarianPage } from './pages/PerformaHarianPage';
+import { InputKomisiRealPage } from './pages/InputKomisiRealPage';
 import { KeuanganPage } from './pages/KeuanganPage';
 import { ArusKasPage } from './pages/ArusKasPage';
 import { PengeluaranPage } from './pages/PengeluaranPage';
@@ -159,6 +160,19 @@ const MainLayout: React.FC = () => {
         return <AkunPage />;
       case 'performa-harian':
         return <PerformaHarianPage />;
+      case 'input-komisi-real':
+        if (role !== 'OWNER' && role !== 'MANAGER') {
+          return (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900">
+              <Lock className="mx-auto h-10 w-10 text-rose-600 mb-2" />
+              <h3 className="font-bold text-base">Akses Dibatasi</h3>
+              <p className="text-xs text-rose-700 mt-1">
+                Input Komisi Real hanya dapat diakses oleh Owner atau Manager.
+              </p>
+            </div>
+          );
+        }
+        return <InputKomisiRealPage onBackToPortal={handleBackToPortal} />;
       case 'dashboard-sharing':
       case 'keuangan-sharing':
         return role === 'INVESTOR' ? (

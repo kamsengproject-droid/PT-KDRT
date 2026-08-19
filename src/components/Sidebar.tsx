@@ -135,12 +135,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               },
               {
                 id: 'performa-harian',
-                label: 'Performa Akun',
+                label: 'Data Omset',
                 icon: TrendingUp,
               },
               {
+                id: 'input-komisi-real',
+                label: 'Input Komisi Real',
+                icon: TrendingUp,
+                allowedRoles: ['OWNER', 'MANAGER'],
+              },
+              {
                 id: 'database-sampel',
-                label: 'Database Sampel',
+                label: 'Produk Sampel',
                 icon: Package,
               },
               {

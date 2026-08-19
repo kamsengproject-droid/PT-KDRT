@@ -117,15 +117,24 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
     },
     {
       id: 'performa-harian',
-      title: 'PERFORMA AKUN',
+      title: 'DATA OMSET',
       icon: TrendingUp,
       desc: 'GMV, Estimasi Komisi, Komisi Real dan analisa harian per akun.',
       color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
       action: () => onNavigate('performa-harian'),
     },
     {
+      id: 'input-komisi-real',
+      title: 'INPUT KOMISI REAL',
+      icon: TrendingUp,
+      desc: 'Input omset harian dan komisi.',
+      color: 'text-rose-600 bg-rose-50 border-rose-200',
+      action: () => onNavigate('input-komisi-real'),
+    },
+
+    {
       id: 'database-sampel',
-      title: 'DATABASE SAMPEL',
+      title: 'PRODUK SAMPEL',
       icon: Package,
       desc: 'Database produk affiliate & pelacakan sampel lengkap.',
       color: 'text-purple-600 bg-purple-50 border-purple-200',
@@ -217,15 +226,24 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
     },
     {
       id: 'performa-harian',
-      title: 'PERFORMA AKUN',
+      title: 'DATA OMSET',
       icon: TrendingUp,
       desc: 'GMV, Estimasi Komisi, Komisi Real akun Sharing & tim.',
       color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
       action: () => onNavigate('performa-harian'),
     },
     {
+      id: 'input-komisi-real',
+      title: 'INPUT KOMISI REAL',
+      icon: TrendingUp,
+      desc: 'Input omset harian dan komisi.',
+      color: 'text-rose-600 bg-rose-50 border-rose-200',
+      action: () => onNavigate('input-komisi-real'),
+    },
+
+    {
       id: 'database-sampel',
-      title: 'DATABASE SAMPEL',
+      title: 'PRODUK SAMPEL',
       icon: Package,
       desc: 'Database produk affiliate & pelacakan sampel lengkap.',
       color: 'text-purple-600 bg-purple-50 border-purple-200',
@@ -321,7 +339,7 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
     },
     {
       id: 'performa-harian',
-      title: 'PERFORMA AKUN',
+      title: 'DATA OMSET',
       icon: TrendingUp,
       desc: 'Data performa akun Sharing (GMV & Komisi).',
       color: 'text-purple-600 bg-purple-50 border-purple-200',
@@ -329,7 +347,7 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
     },
     {
       id: 'database-sampel',
-      title: 'DATABASE SAMPEL',
+      title: 'PRODUK SAMPEL',
       icon: Package,
       desc: 'Daftar sampel & produk affiliate sharing.',
       color: 'text-emerald-600 bg-emerald-50 border-emerald-200',

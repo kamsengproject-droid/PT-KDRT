@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { subscribeTransactions, createFinancialTransaction as addTransaction, voidTransaction } from '../services/transactionService';
+import { subscribeTransactions, createFinancialTransaction as addTransaction, deleteTransaction } from '../services/transactionService';
 import { FinancialTransaction } from '../types';
 import { formatRupiah, formatTanggal } from '../utils/formatters';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -100,7 +100,7 @@ export const SaldoAwalPage: React.FC = () => {
     try {
       const uid = userProfile?.uid || currentUser?.uid || 'system';
       const name = userProfile?.name || currentUser?.displayName || 'Owner';
-      await voidTransaction(tx.id!, uid, name, 'Dibatalkan oleh Owner');
+      await deleteTransaction(tx.id!, uid, name, 'Dihapus oleh Owner (Saldo Awal)');
       setSuccessMsg('Saldo awal dibatalkan.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {
@@ -165,7 +165,7 @@ export const SaldoAwalPage: React.FC = () => {
               <tr><td colSpan={6} className="p-4 text-center">Belum ada data saldo awal.</td></tr>
             ) : (
               transactions.map(tx => (
-                <tr key={tx.id} className={tx.status === 'VOID' ? 'bg-zinc-50/50 opacity-60' : ''}>
+                <tr key={tx.id} className={tx.status === "VOID" ? 'bg-zinc-50/50 opacity-60' : ''}>
                   <td className="px-5 py-3.5 whitespace-nowrap font-medium">{formatTanggal(tx.date)}</td>
                   <td className="px-5 py-3.5 whitespace-nowrap">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black ${tx.scope === 'SHARING' ? 'bg-indigo-100 text-indigo-700' : 'bg-rose-100 text-rose-700'}`}>

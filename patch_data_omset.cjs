@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+const fs = require('fs');
+
+const code = `import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, TrendingUp, Sparkles, Building, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -80,13 +82,13 @@ export const PerformaHarianPage: React.FC<{ onBackToPortal?: () => void }> = ({ 
               {kHariIni > 0 ? formatRupiah(kHariIni) : 'BELUM ADA DATA'}
             </span>
           </div>
-          <div className="${bgColor} p-4 rounded-xl border border-zinc-200 shadow-sm">
+          <div className="\${bgColor} p-4 rounded-xl border border-zinc-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-indigo-700 block">GMV Bulan Ini</span>
             <span className="text-xl font-black text-indigo-950 mt-1 block">
               {gBulanIni > 0 ? formatRupiah(gBulanIni) : 'Rp 0'}
             </span>
           </div>
-          <div className="${bgColor} p-4 rounded-xl border border-zinc-200 shadow-sm">
+          <div className="\${bgColor} p-4 rounded-xl border border-zinc-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-indigo-700 block">Komisi Real Bulan Ini</span>
             <span className="text-xl font-black text-indigo-950 mt-1 block">
               {kBulanIni > 0 ? formatRupiah(kBulanIni) : 'Rp 0'}
@@ -176,3 +178,6 @@ export const PerformaHarianPage: React.FC<{ onBackToPortal?: () => void }> = ({ 
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/pages/PerformaHarianPage.tsx', code);

@@ -328,45 +328,39 @@ export async function recordTikTokIncome(
 }
 
 // 6. VOID Transaksi (Koreksi Transaksi Tanpa Menghapus Permanen)
-export async function voidTransaction(
+export async function deleteTransaction(
   transactionId: string,
   currentTransaction: FinancialTransaction,
-  voidReason: string,
+  deleteReason: string,
   currentUserId: string,
   currentUserName: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    if (!voidReason || voidReason.trim().length === 0) {
-      throw new Error('Alasan pembatalan (VOID) wajib diisi untuk audit trail.');
+    if (!deleteReason || deleteReason.trim().length === 0) {
+      throw new Error('Alasan penghapusan wajib diisi untuk audit trail.');
     }
 
     const docRef = doc(db, TRANSACTIONS_COLLECTION, transactionId);
 
-    await updateDoc(docRef, {
-      status: 'VOID',
-      voidReason: voidReason.trim(),
-      voidedAt: serverTimestamp(),
-      voidedBy: currentUserId,
-      voidedByName: currentUserName,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUserId,
-      updatedByName: currentUserName,
-    });
+    // Hard delete
+    await deleteDoc(docRef);
 
     await catatAuditLog(
       currentUserId,
       currentUserName,
-      'TRANSACTION_VOIDED',
-      `[VOID] ${currentTransaction.type} - Rp ${currentTransaction.amount.toLocaleString('id-ID')}`,
-      `Transaksi ID: ${transactionId}, Kategori: ${currentTransaction.category}, Alasan VOID: ${voidReason.trim()}`
+      'DELETE_TRANSACTION',
+      `[HAPUS] ${currentTransaction.type} - Rp ${currentTransaction.amount.toLocaleString('id-ID')}`,
+      `Transaksi ID: ${transactionId}, Kategori: ${currentTransaction.category}, Alasan HAPUS: ${deleteReason.trim()}`,
+      currentTransaction, // Before state
+      null // After state
     );
 
     return {
       success: true,
-      message: `Transaksi berhasil di-VOID (dibatalkan dari saldo kas). Catatan alasan telah disimpan di audit log.`,
+      message: `Transaksi berhasil dihapus dari sistem. Audit log telah dicatat.`,
     };
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${TRANSACTIONS_COLLECTION}/${transactionId}`);
+    handleFirestoreError(error, OperationType.DELETE, `${TRANSACTIONS_COLLECTION}/${transactionId}`);
     throw error;
   }
 }

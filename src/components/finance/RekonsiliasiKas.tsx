@@ -334,7 +334,7 @@ export const RekonsiliasiKas: React.FC = () => {
                     onChange={(e) => setSelectedScope(e.target.value as any)}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-bold"
                   >
-                    <option value="ALL">GABUNGAN (SEMUA)</option>
+                    
                     <option value="SHARING">SHARING</option>
                     <option value="PRIBADI">PRIBADI</option>
                   </select>
