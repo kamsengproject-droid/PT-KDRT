@@ -35,8 +35,11 @@ import {
   Percent,
   Check,
   SlidersHorizontal,
+  Camera,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ProductScanModal } from '../components/sample/ProductScanModal';
 import {
   AffiliateSample,
   SampleStatus,
@@ -67,6 +70,7 @@ import { formatRupiah, formatTanggal, tanggalHariIni, exportToCSV } from '../uti
 interface DatabaseSampelPageProps {
   onBackToPortal?: () => void;
   initialProductId?: string;
+  initialTab?: 'SAMPEL' | 'PRODUK' | 'MASTER_PRODUK';
 }
 
 const STATUS_FLOW: SampleStatus[] = ['DIPESAN', 'DIKIRIM', 'DITERIMA', 'DIGUNAKAN', 'SELESAI'];
@@ -87,6 +91,7 @@ const KATEGORI_OPTIONS = [
 export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   onBackToPortal,
   initialProductId,
+  initialTab,
 }) => {
   const { userProfile, role, loading: authLoading, currentUser, employeeProfile } = useAuth();
   const isOwner = role === 'OWNER';
@@ -104,7 +109,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [scopeFilter, setScopeFilter] = useState<'SEMUA' | ScopeType>(isInvestor ? 'SHARING' : 'SEMUA');
-  const [activeTab, setActiveTab] = useState<'SAMPEL' | 'MASTER_PRODUK'>('SAMPEL');
+  const [activeTab, setActiveTab] = useState<'SAMPEL' | 'MASTER_PRODUK'>(
+    initialTab === 'PRODUK' || initialTab === 'MASTER_PRODUK' ? 'MASTER_PRODUK' : 'SAMPEL'
+  );
+
+  // AI Screenshot Scan Modal state
+  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
 
   // Chooser Modal State (+ TAMBAH PRODUK)
   const [showAddChooser, setShowAddChooser] = useState<boolean>(false);
@@ -666,15 +676,28 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
           </p>
         </div>
 
-        {/* Big Action Button */}
+        {/* Big Action Buttons */}
         {!isInvestor && (role !== 'EMPLOYEE' || employeeProfile?.permissions?.canCreateSampleProduct) && (
-          <div className="relative">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Direct AI Scan Button */}
+            {!isEmployee && (
+              <button
+                type="button"
+                id="btn-scan-screenshot-produk"
+                onClick={() => setIsScanModalOpen(true)}
+                className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white px-5 py-4 text-sm font-black shadow-lg shadow-emerald-600/25 transition-all cursor-pointer border border-emerald-400/30"
+              >
+                <Camera className="h-5 w-5" />
+                <span>📷 SCAN SCREENSHOT PRODUK</span>
+              </button>
+            )}
+
             <button
               onClick={() => setShowAddChooser(true)}
-              className="inline-flex items-center gap-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-zinc-950 px-6 py-4 text-sm font-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white px-5 py-4 text-sm font-black shadow-lg transition-all cursor-pointer border border-zinc-700"
             >
-              <Plus className="h-6 w-6 stroke-[3]" />
-              <span>+ TAMBAH PRODUK</span>
+              <Plus className="h-5 w-5 stroke-[3]" />
+              <span>+ TAMBAH DATA</span>
             </button>
 
             {/* Modal Chooser popup */}
@@ -684,44 +707,71 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                   <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                     <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                       <Package className="h-5 w-5 text-emerald-600" />
-                      TAMBAH DATA PRODUK SAMPEL
+                      TAMBAH DATA PRODUK & SAMPEL
                     </h3>
                     <button
                       onClick={() => setShowAddChooser(false)}
-                      className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                      className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
                     >
                       <X className="h-5 w-5" />
                     </button>
                   </div>
 
                   <p className="text-xs text-zinc-500">
-                    Pilih jenis data yang ingin Anda tambahkan:
+                    Pilih cara penambahan data yang Anda inginkan:
                   </p>
 
                   <div className="grid grid-cols-1 gap-3 pt-1">
                     {!isEmployee && (
-                    <>
-                    {/* Option 1: Master Produk */}
-                    <button
-                      type="button"
-                      onClick={handleOpenAddProduct}
-                      className="group flex items-start gap-4 rounded-2xl border-2 border-zinc-200 bg-white p-4 text-left hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                        <ShoppingBag className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-black text-sm text-zinc-900 group-hover:text-emerald-800 flex items-center gap-1.5">
-                          [ PRODUK BARU ]
-                        </h4>
-                        <p className="text-xs text-zinc-500 mt-1">
-                          Katalog barang promosi, komisi affiliate & link toko.
-                        </p>
-                      </div>
-                    </button>
+                      <>
+                        {/* Option 0: Scan Screenshot AI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddChooser(false);
+                            setIsScanModalOpen(true);
+                          }}
+                          className="group flex items-start gap-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/50 p-4 text-left hover:border-emerald-600 hover:bg-emerald-100/60 transition-all cursor-pointer"
+                        >
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white group-hover:scale-105 transition-transform shadow-md">
+                            <Camera className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-black text-sm text-emerald-950 flex items-center gap-1.5">
+                                [ 📷 SCAN SCREENSHOT ]
+                              </h4>
+                              <span className="text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded">
+                                AI AUTO-FILL
+                              </span>
+                            </div>
+                            <p className="text-xs text-emerald-800 mt-1">
+                              Upload screenshot TikTok Shop / Shopee. AI mengisi form otomatis.
+                            </p>
+                          </div>
+                        </button>
 
-                    </>
+                        {/* Option 1: Master Produk Manual */}
+                        <button
+                          type="button"
+                          onClick={handleOpenAddProduct}
+                          className="group flex items-start gap-4 rounded-2xl border-2 border-zinc-200 bg-white p-4 text-left hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer"
+                        >
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                            <ShoppingBag className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-zinc-900 group-hover:text-emerald-800 flex items-center gap-1.5">
+                              [ PRODUK BARU MANUAL ]
+                            </h4>
+                            <p className="text-xs text-zinc-500 mt-1">
+                              Input manual katalog barang, harga, komisi & link toko.
+                            </p>
+                          </div>
+                        </button>
+                      </>
                     )}
+
                     {/* Option 2: Sampel Produk */}
                     <button
                       type="button"
@@ -1880,6 +1930,25 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: SCAN SCREENSHOT PRODUK (AI) ================= */}
+      <ProductScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        accounts={accounts}
+        existingProducts={products}
+        currentUserId={userProfile?.uid || 'anonymous'}
+        currentUserName={userProfile?.name || 'User'}
+        defaultScope={isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI')}
+        canChooseScope={!isEmployee && !isInvestor}
+        onProductCreated={(newProd, autoOpenSample) => {
+          setProducts((prev) => [newProd, ...prev.filter((p) => p.id !== newProd.id)]);
+          setSuccessToast(`Produk "${newProd.productName}" berhasil ditambahkan ke Katalog.`);
+          if (autoOpenSample) {
+            handleOpenBuySample(newProd);
+          }
+        }}
+      />
     </div>
   );
 };

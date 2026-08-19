@@ -19,6 +19,16 @@ import { catatAuditLog } from './auditService';
 
 export const PRODUCTS_COLLECTION = 'products';
 
+function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
+
 // 1. Subscribe to Products
 export function subscribeProducts(
   options?: {
@@ -132,7 +142,7 @@ export async function createProduct(
     }
   }
 
-  const payload = {
+  const payload = cleanUndefined({
     ...productData,
     ...photoMetadata,
     productPrice: Number(productData.productPrice) || 0,
@@ -143,7 +153,7 @@ export async function createProduct(
     createdByName: currentUserName,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  };
+  });
 
   try {
     const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
@@ -208,7 +218,7 @@ export async function updateProduct(
 
   try {
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
-    await updateDoc(docRef, payload);
+    await updateDoc(docRef, cleanUndefined(payload));
 
     const isStatusChange = updates.status && updates.status !== currentProduct.status;
     const action = isStatusChange ? 'PRODUCT_STATUS_CHANGED' : 'PRODUCT_UPDATED';
