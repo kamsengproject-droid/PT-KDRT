@@ -1,7 +1,14 @@
 const fs = require('fs');
-let text = fs.readFileSync('src/types.ts', 'utf8');
+let text = fs.readFileSync('src/pages/InvestorDashboardPage.tsx', 'utf8');
 
-text = text.replace(/export type TransactionType = 'INCOME' \| 'EXPENSE';/g, "export type TransactionType = 'INCOME' | 'EXPENSE' | 'OPENING_BALANCE';");
-text = text.replace(/  \| 'OTHER';/g, "  | 'OTHER'\n  | 'OPENING_BALANCE';");
+text = text.replace(
+  "const unsubProd = subscribeProducts('SHARING', setProducts);",
+  "const unsubProd = subscribeProducts({ scope: 'SHARING' }, setProducts);"
+);
 
-fs.writeFileSync('src/types.ts', text);
+text = text.replace(
+  "const unsubAcc = subscribeAccounts('SHARING', setAccounts);",
+  "const unsubAcc = subscribeAccounts('SHARING', setAccounts);" // wait, I don't know subscribeAccounts signature yet
+);
+
+fs.writeFileSync('src/pages/InvestorDashboardPage.tsx', text);

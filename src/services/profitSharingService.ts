@@ -219,8 +219,7 @@ export async function calculateProfitSharingFromTransactions(
   // 1. Fetch transactions where scope == 'SHARING' and status == 'ACTIVE'
   const q = query(
     collection(db, 'transactions'),
-    where('scope', '==', 'SHARING'),
-    where('status', '==', 'ACTIVE')
+    where('scope', '==', 'SHARING')
   );
   const snap = await getDocs(q);
 
@@ -229,6 +228,9 @@ export async function calculateProfitSharingFromTransactions(
 
   snap.forEach((docSnap) => {
     const data = docSnap.data() as FinancialTransaction;
+    // Client-side filter for ACTIVE status to handle legacy documents without status field
+    if ((data.status || 'ACTIVE') !== 'ACTIVE') return;
+    
     if (data.date && data.date.startsWith(periodPrefix)) {
       if (data.type === 'INCOME') {
         totalIncome += Number(data.amount) || 0;
