@@ -1,116 +1,58 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Lock,
-  TrendingUp,
-  DollarSign,
-  ArrowUpRight,
-  Sparkles,
-  PieChart as PieIcon,
-  ShieldCheck,
-  Filter,
-  X,
-} from 'lucide-react';
-import { subscribeDailyPerformance } from '../services/performanceService';
-import { subscribeExpenses } from '../services/expenseService';
-import { subscribeTransactions } from '../services/transactionService';
-import { FinancialTransaction, DailyPerformance, Expense } from '../types';
-import { formatBulanTahun, formatRupiah, formatTanggal, bulanHariIni } from '../utils/formatters';
-import { useAuth } from '../context/AuthContext';
+const fs = require('fs');
+let code = fs.readFileSync('src/pages/DashboardSharingPage.tsx', 'utf8');
 
-export const DashboardPribadiPage: React.FC = () => {
-  const { userProfile, loading: authLoading, currentUser } = useAuth();
-  const [selectedMonth, setSelectedMonth] = useState<string>(bulanHariIni());
-  const [performance, setPerformance] = useState<DailyPerformance[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+// Add imports
+code = code.replace(
+  /import \{[\s\S]*?\} from 'lucide-react';/,
+  `$&
+import { TrendingUp as TrendingUpIcon, DollarSign as DollarSignIcon, X } from 'lucide-react';`
+);
+code = code.replace(/import \{ subscribeExpenses \} from '\.\.\/services\/expenseService';/, 
+  `$&
+import { subscribeTransactions } from '../services/transactionService';
+import { FinancialTransaction } from '../types';`
+);
+
+// Add states
+code = code.replace(/const \[expenses, setExpenses\] = useState<Expense\[\]>\(\[\]\);/, 
+  `const [expenses, setExpenses] = useState<Expense[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [showIncomeDetail, setShowIncomeDetail] = useState(false);
-  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);`
+);
 
-  useEffect(() => {
-    if (authLoading || !currentUser || !userProfile?.active) {
-      return;
-    }
-    const unsubPerf = subscribeDailyPerformance('PRIBADI', setPerformance);
-    const unsubExp = subscribeExpenses('PRIBADI', setExpenses);
-    const unsubTx = subscribeTransactions({ scope: 'PRIBADI', status: 'ACTIVE' }, setTransactions);
+// Add subscribe
+code = code.replace(/const unsubExp = subscribeExpenses\('SHARING', setExpenses\);/,
+  `$&
+    const unsubTx = subscribeTransactions({ scope: 'SHARING', status: 'ACTIVE' }, setTransactions);`
+);
+code = code.replace(/unsubExp\(\);/, `$&
+      unsubTx();`);
 
-    return () => {
-      unsubPerf();
-      unsubExp();
-      unsubTx();
-    };
-  }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active]);
-
-  const filteredPerf = performance.filter((p) => p.date.startsWith(selectedMonth));
-  const filteredExp = expenses.filter((e) => e.date.startsWith(selectedMonth));
-
-  const totalGmv = filteredPerf.reduce((sum, p) => sum + p.gmv, 0);
-  const totalKomisiKotor = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
-  const totalPengeluaran = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
-  const labaBersihPribadi = totalKomisiKotor - totalPengeluaran;
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block rounded-full bg-zinc-900 px-3 py-0.5 text-[11px] font-bold text-white uppercase tracking-wide">
-              Khusus Owner
-            </span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 flex items-center gap-2.5 mt-1">
-            <Lock className="h-6 w-6 text-zinc-800" />
-            Dashboard Bisnis Pribadi
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Rekap pendapatan GMV, komisi afiliasi pribadi, dan pengeluaran mandiri tanpa bagi hasil (100% Milik Owner).
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-zinc-200 p-1.5 shadow-2xs">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border-none bg-transparent px-2 py-1 text-xs font-bold text-zinc-900 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Main KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">GMV Akun Pribadi</span>
-          <p className="text-2xl font-extrabold text-zinc-900 mt-2">{formatRupiah(totalGmv)}</p>
-          <span className="text-[11px] text-zinc-500 font-medium">Bulan {formatBulanTahun(selectedMonth)}</span>
-        </div>
-
-        <div 
+// Fix cards to open modals
+code = code.replace(/<div className="rounded-xl border border-emerald-200 bg-emerald-50\/40 p-4 shadow-xs">/, 
+  `<div 
     onClick={() => setShowIncomeDetail(true)}
-    className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-2xs cursor-pointer hover:bg-emerald-100/50 transition-colors"
-  >
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Komisi Bersih</span>
-          <p className="text-2xl font-extrabold text-emerald-800 mt-2">{formatRupiah(totalKomisiKotor)}</p>
-          <span className="text-[11px] text-emerald-700 font-medium">Masuk Kas Pribadi</span>
-        </div>
-
-        <div 
+    className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-xs cursor-pointer hover:bg-emerald-100/50 transition-colors"
+  >`
+);
+code = code.replace(/<div className="rounded-xl border border-rose-200 bg-rose-50\/40 p-4 shadow-xs">/, 
+  `<div 
     onClick={() => setShowExpenseDetail(true)}
-    className="rounded-2xl border border-rose-100 bg-rose-50/50 p-5 shadow-2xs cursor-pointer hover:bg-rose-100/50 transition-colors"
-  >
-          <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Pengeluaran Pribadi</span>
-          <p className="text-2xl font-extrabold text-rose-800 mt-2">{formatRupiah(totalPengeluaran)}</p>
-          <span className="text-[11px] text-rose-700 font-medium">{filteredExp.length} Transaksi</span>
-        </div>
+    className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 shadow-xs cursor-pointer hover:bg-rose-100/50 transition-colors"
+  >`
+);
 
-        <div className="rounded-2xl border border-zinc-900 bg-zinc-900 p-5 text-white shadow-md">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Laba Bersih 100%</span>
-          <p className="text-2xl font-extrabold text-emerald-400 mt-2">{formatRupiah(labaBersihPribadi)}</p>
-          <span className="text-[11px] text-zinc-400 font-medium">Keuntungan Bersih Owner</span>
-        </div>
-      </div>
+// Calculate totals directly from transactions
+code = code.replace(/const totalKomisiKotor = filteredPerf.reduce\(\(sum, p\) => sum \+ p\.komisiKotor, 0\);/,
+  `const totalKomisiKotor = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);`
+);
+code = code.replace(/const totalPengeluaran = filteredExp.reduce\(\(sum, e\) => sum \+ e\.amount, 0\);/,
+  `const totalPengeluaran = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);`
+);
 
+// Add modals before closing div
+const modals = `
       {/* Income Detail Modal */}
       {showIncomeDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -118,8 +60,8 @@ export const DashboardPribadiPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-zinc-100 p-6 shrink-0">
               <div>
                 <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
-                  <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  SUMBER UANG MASUK PRIBADI
+                  <TrendingUpIcon className="h-6 w-6 text-emerald-600" />
+                  SUMBER UANG MASUK SHARING
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
                   Detail pendapatan untuk periode {formatBulanTahun(selectedMonth)}
@@ -189,8 +131,8 @@ export const DashboardPribadiPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-zinc-100 p-6 shrink-0">
               <div>
                 <h3 className="text-xl font-black text-rose-900 flex items-center gap-2">
-                  <DollarSign className="h-6 w-6 text-rose-600" />
-                  RINCIAN UANG KELUAR PRIBADI
+                  <DollarSignIcon className="h-6 w-6 text-rose-600" />
+                  RINCIAN UANG KELUAR SHARING
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
                   Detail pengeluaran untuk periode {formatBulanTahun(selectedMonth)}
@@ -216,13 +158,14 @@ export const DashboardPribadiPage: React.FC = () => {
                     <th className="px-4 py-3 border-b border-zinc-200">Deskripsi</th>
                     <th className="px-4 py-3 border-b border-zinc-200">Nominal (Rp)</th>
                     <th className="px-4 py-3 border-b border-zinc-200">Metode</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Bukti</th>
                     <th className="px-4 py-3 rounded-tr-xl border-b border-zinc-200">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700 bg-white">
                   {transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
+                      <td colSpan={7} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
                     </tr>
                   ) : (
                     transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE')
@@ -237,6 +180,13 @@ export const DashboardPribadiPage: React.FC = () => {
                         <td className="px-4 py-3 font-black text-rose-600">{formatRupiah(item.amount)}</td>
                         <td className="px-4 py-3"><span className="text-[10px] font-bold text-zinc-500">{item.paymentMethod || 'TRANSFER'}</span></td>
                         <td className="px-4 py-3">
+                           {item.receiptUrl ? (
+                             <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-bold text-[10px]">Lihat</a>
+                           ) : (
+                             <span className="text-zinc-400 italic text-[10px]">-</span>
+                           )}
+                        </td>
+                        <td className="px-4 py-3">
                           <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">AKTIF</span>
                         </td>
                       </tr>
@@ -248,7 +198,8 @@ export const DashboardPribadiPage: React.FC = () => {
           </div>
         </div>
       )}
+`;
 
-    </div>
-  );
-};
+code = code.replace(/    <\/div>\n  \);\n\};/, modals + '\n    </div>\n  );\n};');
+
+fs.writeFileSync('src/pages/DashboardSharingPage.tsx', code);

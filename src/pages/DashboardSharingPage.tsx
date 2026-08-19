@@ -10,20 +10,25 @@ import {
   ArrowDownRight,
   Sparkles,
   PieChart as PieIcon,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { subscribeDailyPerformance } from '../services/performanceService';
 import { subscribeExpenses } from '../services/expenseService';
+import { subscribeTransactions } from '../services/transactionService';
+import { FinancialTransaction, DailyPerformance, Expense, AttendanceRecord, Employee } from '../types';
 import { subscribeTodayAttendance } from '../services/attendanceService';
 import { subscribeEmployees } from '../services/employeeService';
-import { DailyPerformance, Expense, AttendanceRecord, Employee } from '../types';
-import { formatBulanTahun, formatRupiah, tanggalHariIni, bulanHariIni } from '../utils/formatters';
+import { formatBulanTahun, formatRupiah, formatTanggal, tanggalHariIni, bulanHariIni } from '../utils/formatters';
 
 export const DashboardSharingPage: React.FC = () => {
   const { role, userProfile, loading: authLoading, currentUser } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState<string>(bulanHariIni());
   const [performance, setPerformance] = useState<DailyPerformance[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [showIncomeDetail, setShowIncomeDetail] = useState(false);
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
@@ -33,12 +38,14 @@ export const DashboardSharingPage: React.FC = () => {
     }
     const unsubPerf = subscribeDailyPerformance('SHARING', setPerformance);
     const unsubExp = subscribeExpenses('SHARING', setExpenses);
+    const unsubTx = subscribeTransactions({ scope: 'SHARING', status: 'ACTIVE' }, setTransactions);
     const unsubAtt = subscribeTodayAttendance(tanggalHariIni(), setAttendance);
     const unsubEmp = subscribeEmployees('SHARING', setEmployees);
 
     return () => {
       unsubPerf();
       unsubExp();
+      unsubTx();
       unsubAtt();
       unsubEmp();
     };
@@ -49,8 +56,8 @@ export const DashboardSharingPage: React.FC = () => {
 
   // Financial calculations
   const totalGmv = filteredPerf.reduce((sum, p) => sum + p.gmv, 0);
-  const totalKomisiKotor = filteredPerf.reduce((sum, p) => sum + p.komisiKotor, 0);
-  const totalPengeluaran = filteredExp.reduce((sum, e) => sum + e.amount, 0);
+  const totalKomisiKotor = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
+  const totalPengeluaran = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
   const labaBersihSharing = totalKomisiKotor - totalPengeluaran;
 
   // Split: Owner 50%, Investor 50%
@@ -96,7 +103,10 @@ export const DashboardSharingPage: React.FC = () => {
           <span className="text-[10px] text-slate-400 font-medium">Bulan {formatBulanTahun(selectedMonth)}</span>
         </div>
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-xs">
+        <div 
+    onClick={() => setShowIncomeDetail(true)}
+    className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-xs cursor-pointer hover:bg-emerald-100/50 transition-colors"
+  >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Komisi Kotor Masuk</span>
             <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-bold">Omset</span>
@@ -105,7 +115,10 @@ export const DashboardSharingPage: React.FC = () => {
           <span className="text-[10px] text-emerald-700/80 font-medium">Pendapatan Tim Sharing</span>
         </div>
 
-        <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 shadow-xs">
+        <div 
+    onClick={() => setShowExpenseDetail(true)}
+    className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 shadow-xs cursor-pointer hover:bg-rose-100/50 transition-colors"
+  >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Biaya Operasional</span>
             <span className="text-[10px] text-rose-700 bg-rose-100/70 px-1.5 py-0.5 rounded font-bold">{filteredExp.length} Tx</span>
@@ -209,6 +222,153 @@ export const DashboardSharingPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Income Detail Modal */}
+      {showIncomeDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl border border-zinc-200 flex flex-col h-[85vh]">
+            <div className="flex items-center justify-between border-b border-zinc-100 p-6 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-emerald-600" />
+                  SUMBER UANG MASUK SHARING
+                </h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Detail pendapatan untuk periode {formatBulanTahun(selectedMonth)}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total Pendapatan</div>
+                  <div className="font-black text-lg">{formatRupiah(totalKomisiKotor)}</div>
+                </div>
+                <button onClick={() => setShowIncomeDetail(false)} className="rounded-full p-2 bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-zinc-50/50">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white text-zinc-500 uppercase tracking-wider text-[10px] font-bold sticky top-0 shadow-sm z-10">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-xl border-b border-zinc-200">Tanggal</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Sumber Dana</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Kategori</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Akun</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Deskripsi</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Nominal (Rp)</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Metode</th>
+                    <th className="px-4 py-3 rounded-tr-xl border-b border-zinc-200">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-zinc-700 bg-white">
+                  {transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
+                    </tr>
+                  ) : (
+                    transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME')
+                    .sort((a,b) => b.date.localeCompare(a.date))
+                    .map((item) => (
+                      <tr key={item.id} className="hover:bg-emerald-50/30 transition-colors">
+                        <td className="px-4 py-3 font-bold text-zinc-900 whitespace-nowrap">{formatTanggal(item.date)}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-700">{item.sourceType || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700">{item.category}</span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-zinc-800">{item.accountName || '-'}</td>
+                        <td className="px-4 py-3 text-zinc-600">{item.description}</td>
+                        <td className="px-4 py-3 font-black text-emerald-600">{formatRupiah(item.amount)}</td>
+                        <td className="px-4 py-3"><span className="text-[10px] font-bold text-zinc-500">{item.paymentMethod || 'TRANSFER'}</span></td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">AKTIF</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expense Detail Modal */}
+      {showExpenseDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl border border-zinc-200 flex flex-col h-[85vh]">
+            <div className="flex items-center justify-between border-b border-zinc-100 p-6 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-rose-900 flex items-center gap-2">
+                  <DollarSign className="h-6 w-6 text-rose-600" />
+                  RINCIAN UANG KELUAR SHARING
+                </h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Detail pengeluaran untuk periode {formatBulanTahun(selectedMonth)}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-2 bg-rose-50 rounded-xl border border-rose-200 text-rose-900 text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total Pengeluaran</div>
+                  <div className="font-black text-lg">{formatRupiah(totalPengeluaran)}</div>
+                </div>
+                <button onClick={() => setShowExpenseDetail(false)} className="rounded-full p-2 bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-zinc-50/50">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white text-zinc-500 uppercase tracking-wider text-[10px] font-bold sticky top-0 shadow-sm z-10">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-xl border-b border-zinc-200">Tanggal</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Kategori</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Deskripsi</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Nominal (Rp)</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Metode</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Bukti</th>
+                    <th className="px-4 py-3 rounded-tr-xl border-b border-zinc-200">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-zinc-700 bg-white">
+                  {transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
+                    </tr>
+                  ) : (
+                    transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE')
+                    .sort((a,b) => b.date.localeCompare(a.date))
+                    .map((item) => (
+                      <tr key={item.id} className="hover:bg-rose-50/30 transition-colors">
+                        <td className="px-4 py-3 font-bold text-zinc-900 whitespace-nowrap">{formatTanggal(item.date)}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700">{item.category}</span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">{item.description}</td>
+                        <td className="px-4 py-3 font-black text-rose-600">{formatRupiah(item.amount)}</td>
+                        <td className="px-4 py-3"><span className="text-[10px] font-bold text-zinc-500">{item.paymentMethod || 'TRANSFER'}</span></td>
+                        <td className="px-4 py-3">
+                           {item.receiptUrl ? (
+                             <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-bold text-[10px]">Lihat</a>
+                           ) : (
+                             <span className="text-zinc-400 italic text-[10px]">-</span>
+                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">AKTIF</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

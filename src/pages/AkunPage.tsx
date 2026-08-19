@@ -5,15 +5,18 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
-  Globe,
   Share2,
   Lock,
   ChevronRight,
   Home,
-  XCircle,
   AlertCircle,
   X,
-  Layers,
+  Video,
+  ShoppingBag,
+  Instagram,
+  Facebook,
+  Youtube,
+  Radio,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -29,10 +32,59 @@ interface AkunPageProps {
   onBackToPortal?: () => void;
 }
 
+// Brand Visual Platform Component
+const PlatformBadgeIcon: React.FC<{ platform: string; className?: string }> = ({
+  platform,
+  className = 'h-5 w-5',
+}) => {
+  const p = (platform || '').toLowerCase();
+  if (p.includes('tiktok')) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white shadow-xs shrink-0" title="TikTok">
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.067-.095a2.893 2.893 0 0 1 2.372-4.542c.404 0 .788.084 1.137.235V9.45a6.338 6.338 0 0 0-1.137-.103A6.337 6.337 0 0 0 3.12 15.684a6.337 6.337 0 0 0 6.337 6.337c3.488 0 6.337-2.849 6.337-6.337V8.583a8.17 8.17 0 0 0 4.795 1.548V6.686h-1z" />
+        </svg>
+      </div>
+    );
+  }
+  if (p.includes('shopee')) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white shadow-xs shrink-0" title="Shopee">
+        <ShoppingBag className={className} />
+      </div>
+    );
+  }
+  if (p.includes('instagram') || p.includes('ig')) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 text-white shadow-xs shrink-0" title="Instagram">
+        <Instagram className={className} />
+      </div>
+    );
+  }
+  if (p.includes('facebook') || p.includes('fb')) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs shrink-0" title="Facebook">
+        <Facebook className={className} />
+      </div>
+    );
+  }
+  if (p.includes('youtube') || p.includes('yt')) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs shrink-0" title="YouTube">
+        <Youtube className={className} />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800 text-white shadow-xs shrink-0" title="Medsos">
+      <Video className={className} />
+    </div>
+  );
+};
+
 export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
   const { userProfile, role, loading, currentUser } = useAuth();
   const isOwner = role === 'OWNER';
-  const isManager = role === 'MANAGER';
   const isInvestor = role === 'INVESTOR';
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -193,22 +245,22 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
             Akun TikTok & Medsos
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Pengelolaan channel marketing terpisah antara <strong>Akun Sharing (Investor)</strong> dan <strong>Akun Pribadi (Owner)</strong>.
+            Pengelolaan channel marketing terpisah antara <strong>Akun Sharing (Emerald)</strong> dan <strong>Akun Pribadi (Blue)</strong>.
           </p>
         </div>
 
         {!isInvestor && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => handleOpenAdd('SHARING')}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-emerald-500 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-emerald-500 transition-all cursor-pointer active:scale-95"
             >
               <Plus className="h-4 w-4 stroke-[3]" />
               Tambah Akun Sharing
             </button>
             <button
               onClick={() => handleOpenAdd('PRIBADI')}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-blue-500 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-blue-500 transition-all cursor-pointer active:scale-95"
             >
               <Plus className="h-4 w-4 stroke-[3]" />
               Tambah Akun Pribadi
@@ -218,7 +270,7 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
       </div>
 
       {/* ========================================================================= */}
-      {/* SECTION 1: AKUN SHARING (INVESTOR & KANTOR) */}
+      {/* SECTION 1: AKUN SHARING (INVESTOR & KANTOR) - EMERALD PALETTE */}
       {/* ========================================================================= */}
       <div className="rounded-3xl border-2 border-emerald-300/80 bg-white p-5 sm:p-7 shadow-sm space-y-5">
         {/* Section Header */}
@@ -271,27 +323,31 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
             {sharingAccounts.map((acc) => (
               <div
                 key={acc.id}
-                className="rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/30 to-white p-5 shadow-2xs flex flex-col justify-between hover:border-emerald-400 transition-all"
+                className="rounded-2xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/40 to-white p-5 shadow-2xs flex flex-col justify-between hover:border-emerald-400 transition-all"
               >
                 <div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold">
-                        <Globe className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-zinc-900 truncate">{acc.accountName}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <PlatformBadgeIcon platform={acc.platform} />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-black text-sm text-zinc-900 truncate" title={acc.accountName}>
+                          {acc.accountName}
+                        </h3>
                         <span className="text-xs text-zinc-500 font-medium truncate block">
-                          @{acc.username} ({acc.platform})
+                          @{acc.username}
                         </span>
                       </div>
                     </div>
-                    <span className="rounded-full px-2.5 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="rounded-full px-2.5 py-0.5 text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                       SHARING
                     </span>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-zinc-100 space-y-2 text-xs">
+                  <div className="mt-4 pt-3 border-t border-emerald-100/60 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Platform:</span>
+                      <span className="font-bold text-zinc-800">{acc.platform || 'TikTok'}</span>
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">Penanggung Jawab (PIC):</span>
                       <span className="font-bold text-zinc-800">{acc.managerName || '-'}</span>
@@ -299,7 +355,7 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
                     <div className="flex justify-between">
                       <span className="text-zinc-500">Status Akun:</span>
                       <span
-                        className={`inline-flex items-center gap-1 font-bold ${
+                        className={`inline-flex items-center gap-1 font-black text-[11px] ${
                           acc.active ? 'text-emerald-700' : 'text-zinc-400'
                         }`}
                       >
@@ -310,17 +366,17 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
                 </div>
 
                 {!isInvestor && (
-                  <div className="mt-4 pt-3 border-t border-zinc-100 flex gap-2">
+                  <div className="mt-4 pt-3 border-t border-emerald-100/60 flex gap-2">
                     <button
                       onClick={() => handleOpenEdit(acc)}
-                      className="flex-1 rounded-xl border border-zinc-200 bg-white py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 shadow-2xs"
+                      className="flex-1 rounded-xl border border-zinc-200 bg-white py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 shadow-2xs transition-colors"
                     >
                       Edit
                     </button>
                     {isOwner && (
                       <button
                         onClick={() => handleDelete(acc.id!, acc.accountName)}
-                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors"
                         title="Hapus Akun"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -335,7 +391,7 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
       </div>
 
       {/* ========================================================================= */}
-      {/* SECTION 2: AKUN PRIBADI (OWNER PT.KDRT ONLY) */}
+      {/* SECTION 2: AKUN PRIBADI (OWNER PT.KDRT ONLY) - BLUE PALETTE */}
       {/* ========================================================================= */}
       {!isInvestor && (
         <div className="rounded-3xl border-2 border-blue-300/80 bg-white p-5 sm:p-7 shadow-sm space-y-5">
@@ -389,27 +445,31 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
               {privateAccounts.map((acc) => (
                 <div
                   key={acc.id}
-                  className="rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/30 to-white p-5 shadow-2xs flex flex-col justify-between hover:border-blue-400 transition-all"
+                  className="rounded-2xl border border-blue-200/90 bg-gradient-to-b from-blue-50/40 to-white p-5 shadow-2xs flex flex-col justify-between hover:border-blue-400 transition-all"
                 >
                   <div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-bold">
-                          <Globe className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-sm text-zinc-900 truncate">{acc.accountName}</h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <PlatformBadgeIcon platform={acc.platform} />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-black text-sm text-zinc-900 truncate" title={acc.accountName}>
+                            {acc.accountName}
+                          </h3>
                           <span className="text-xs text-zinc-500 font-medium truncate block">
-                            @{acc.username} ({acc.platform})
+                            @{acc.username}
                           </span>
                         </div>
                       </div>
-                      <span className="rounded-full px-2.5 py-0.5 text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
+                      <span className="rounded-full px-2.5 py-0.5 text-[9px] font-black bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
                         PRIBADI
                       </span>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-zinc-100 space-y-2 text-xs">
+                    <div className="mt-4 pt-3 border-t border-blue-100/60 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500">Platform:</span>
+                        <span className="font-bold text-zinc-800">{acc.platform || 'TikTok'}</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-zinc-500">Penanggung Jawab (PIC):</span>
                         <span className="font-bold text-zinc-800">{acc.managerName || '-'}</span>
@@ -417,7 +477,7 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
                       <div className="flex justify-between">
                         <span className="text-zinc-500">Status Akun:</span>
                         <span
-                          className={`inline-flex items-center gap-1 font-bold ${
+                          className={`inline-flex items-center gap-1 font-black text-[11px] ${
                             acc.active ? 'text-blue-700' : 'text-zinc-400'
                           }`}
                         >
@@ -427,17 +487,17 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-zinc-100 flex gap-2">
+                  <div className="mt-4 pt-3 border-t border-blue-100/60 flex gap-2">
                     <button
                       onClick={() => handleOpenEdit(acc)}
-                      className="flex-1 rounded-xl border border-zinc-200 bg-white py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 shadow-2xs"
+                      className="flex-1 rounded-xl border border-zinc-200 bg-white py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 shadow-2xs transition-colors"
                     >
                       Edit
                     </button>
                     {isOwner && (
                       <button
                         onClick={() => handleDelete(acc.id!, acc.accountName)}
-                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors"
                         title="Hapus Akun"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -453,8 +513,8 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
 
       {/* ================= MODAL: TAMBAH / EDIT AKUN ================= */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-zinc-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-zinc-200 my-8">
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-4">
               <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                 <Smartphone className="h-5 w-5 text-emerald-600" />
@@ -510,6 +570,8 @@ export const AkunPage: React.FC<AkunPageProps> = ({ onBackToPortal }) => {
                     <option value="TikTok">TikTok Shop</option>
                     <option value="Shopee">Shopee Video/Live</option>
                     <option value="Instagram">Instagram</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="YouTube">YouTube</option>
                     <option value="Lainnya">Lainnya</option>
                   </select>
                 </div>

@@ -192,6 +192,7 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
 
   // 6. Save attendance record to Firestore with serverTimestamp
   const recordData: Omit<AttendanceRecord, 'id'> = {
+    userId: currentUserId,
     employeeId,
     employeeName,
     date: today,

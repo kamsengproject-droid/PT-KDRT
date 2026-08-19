@@ -26,6 +26,16 @@ import { tanggalHariIni } from '../utils/formatters';
 const TASKS_COLLECTION = 'dailyTasks';
 const TEMPLATES_COLLECTION = 'taskTemplates';
 
+function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
+
 // ==========================================
 // 1. REAL-TIME SUBSCRIPTIONS
 // ==========================================
@@ -143,11 +153,14 @@ export async function createDailyTask(
   actorName: string
 ): Promise<string> {
   try {
-    const docData = {
-      ...taskData,
+    const rawData: any = {
+      tanggal: taskData.tanggal || tanggalHariIni(),
+      employeeId: taskData.employeeId,
+      employeeName: taskData.employeeName || 'Karyawan',
+      taskName: taskData.taskName,
       currentOutput: Number(taskData.currentOutput) || 0,
       targetOutput: Number(taskData.targetOutput) || 1,
-      unitOutput: taskData.unitOutput || 'VT',
+      unitOutput: taskData.unitOutput || 'TAKE VIDEO',
       status: taskData.status || ('BELUM DIKERJAKAN' as DailyTaskStatus),
       priority: taskData.priority || ('NORMAL' as DailyTaskPriority),
       notes: taskData.notes || '',
@@ -167,6 +180,12 @@ export async function createDailyTask(
       updatedByName: actorName,
     };
 
+    if (taskData.accountId) rawData.accountId = taskData.accountId;
+    if (taskData.accountName) rawData.accountName = taskData.accountName;
+    if (taskData.deadline) rawData.deadline = taskData.deadline;
+    if (taskData.templateId) rawData.templateId = taskData.templateId;
+
+    const docData = cleanUndefined(rawData);
     const docRef = await addDoc(collection(db, TASKS_COLLECTION), docData);
 
     // Record audit log
@@ -398,12 +417,12 @@ export async function updateDailyTask(
 ): Promise<void> {
   try {
     const taskRef = doc(db, TASKS_COLLECTION, taskId);
-    const payload: any = {
+    const payload: any = cleanUndefined({
       ...updates,
       updatedAt: serverTimestamp(),
       updatedBy: actorUid,
       updatedByName: actorName,
-    };
+    });
 
     await updateDoc(taskRef, payload);
 

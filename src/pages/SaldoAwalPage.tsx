@@ -61,7 +61,7 @@ export const SaldoAwalPage: React.FC = () => {
         throw new Error('Saldo awal untuk Scope, Rekening, dan Tanggal ini sudah tercatat.');
       }
 
-      const tx: Partial<FinancialTransaction> = {
+      const tx: any = {
         type: 'INCOME',
         sourceType: 'OPENING_BALANCE',
         amount: Number(formData.amount),
@@ -69,6 +69,7 @@ export const SaldoAwalPage: React.FC = () => {
         category: 'Saldo Awal',
         scope: formData.scope as any,
         accountName: formData.accountName,
+        description: formData.notes,
         notes: formData.notes,
         referenceId
       };
@@ -100,7 +101,7 @@ export const SaldoAwalPage: React.FC = () => {
     try {
       const uid = userProfile?.uid || currentUser?.uid || 'system';
       const name = userProfile?.name || currentUser?.displayName || 'Owner';
-      await deleteTransaction(tx.id!, uid, name, 'Dihapus oleh Owner (Saldo Awal)');
+      await deleteTransaction(tx.id!, tx, 'Dihapus oleh Owner (Saldo Awal)', uid, name);
       setSuccessMsg('Saldo awal dibatalkan.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {

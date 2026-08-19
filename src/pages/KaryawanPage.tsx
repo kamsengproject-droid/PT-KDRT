@@ -753,10 +753,13 @@ export const KaryawanPage: React.FC<KaryawanPageProps> = ({
                 </div>
               </div>
 
-              {role === 'OWNER' && (
+              {(role === 'OWNER' || role === 'EMPLOYEE') && (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggleStatus(selectedEmployee)}
+                  
+                  {role === 'OWNER' && (
+                    <button
+                      onClick={() => handleToggleStatus(selectedEmployee)}
+
                     className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors shadow-2xs ${
                       selectedEmployee.active
                         ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
@@ -764,8 +767,9 @@ export const KaryawanPage: React.FC<KaryawanPageProps> = ({
                     }`}
                   >
                     <Power className="h-3.5 w-3.5" />
-                    <span>{selectedEmployee.active ? 'Nonaktifkan' : 'Aktifkan'}</span>
-                  </button>
+                                          <span>{selectedEmployee.active ? 'Nonaktifkan' : 'Aktifkan'}</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => handleOpenEdit(selectedEmployee)}
@@ -820,7 +824,7 @@ export const KaryawanPage: React.FC<KaryawanPageProps> = ({
                     Data profil kepegawaian resmi yang tersimpan di Firestore database PT.KDRT.
                   </p>
                 </div>
-                {role === 'OWNER' && (
+                {(role === 'OWNER' || role === 'EMPLOYEE') && (
                   <button
                     onClick={() => handleOpenEdit(selectedEmployee)}
                     className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 hover:underline"

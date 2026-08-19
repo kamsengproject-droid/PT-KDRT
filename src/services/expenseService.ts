@@ -4,7 +4,6 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -14,6 +13,16 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Expense, ScopeType } from '../types';
 import { catatAuditLog } from './auditService';
 import { createFinancialTransaction } from './transactionService';
+
+function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
 
 export function subscribeExpenses(
   scope?: ScopeType,
@@ -47,16 +56,19 @@ export async function tambahPengeluaran(
 ) {
   try {
     const amount = Number(expense.amount) || 0;
-    const docRef = await addDoc(collection(db, 'expenses'), {
+    const rawData = cleanUndefined({
       ...expense,
       amount,
+      paymentMethod: expense.paymentMethod || 'TRANSFER',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: currentUserId,
     });
 
+    const docRef = await addDoc(collection(db, 'expenses'), rawData);
+
     // Also record transaction in unified transactions collection for single source of truth
-    let sourceType: any = 'MANUAL';
+    let sourceType: any = expense.sourceType || 'DAILY_EXPENSE';
     let refId: any = docRef.id;
 
     if (expense.sampleId) {
@@ -70,10 +82,12 @@ export async function tambahPengeluaran(
       refId = expense.payrollId;
     }
 
+    const txScope: ScopeType = expense.scope === 'PRIBADI' ? 'PRIBADI' : 'SHARING';
+
     await createFinancialTransaction(
-      {
+      cleanUndefined({
         type: 'EXPENSE',
-        scope: expense.scope,
+        scope: txScope,
         amount,
         date: expense.date,
         category: expense.category,
@@ -88,9 +102,11 @@ export async function tambahPengeluaran(
         payrollId: expense.payrollId || null,
         paymentMethod: expense.paymentMethod || 'TRANSFER',
         description: expense.description || `Pengeluaran ${expense.category}`,
+        attachmentUrl: expense.receiptUrl || null,
+        notes: expense.notes || '',
         createdBy: currentUserId,
         createdByName: currentUserName,
-      },
+      }) as any,
       currentUserId,
       currentUserName
     );
@@ -118,10 +134,11 @@ export async function updateExpense(
 ) {
   try {
     const docRef = doc(db, 'expenses', id);
-    await updateDoc(docRef, {
+    const cleaned = cleanUndefined({
       ...updates,
       updatedAt: serverTimestamp(),
     });
+    await updateDoc(docRef, cleaned);
 
     await catatAuditLog(
       currentUserId,
@@ -140,14 +157,25 @@ export async function hapusPengeluaran(
   id: string,
   description: string,
   currentUserId: string,
-  currentUserName: string
+  currentUserName: string,
+  sourceType: string = 'DAILY_EXPENSE'
 ) {
   try {
     await deleteDoc(doc(db, 'expenses', id));
+    
+    // Attempt to delete transaction with deterministic ID
+    try {
+      const deterministicId = `${sourceType}_${id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const txRef = doc(db, 'transactions', deterministicId);
+      await deleteDoc(txRef);
+    } catch (e) {
+      console.warn("Could not delete related transaction", e);
+    }
+    
     await catatAuditLog(
       currentUserId,
       currentUserName,
-      'HAPUS_PENGELUARAN',
+      'DELETE_EXPENSE',
       id,
       `Pengeluaran dihapus: ${description}`
     );

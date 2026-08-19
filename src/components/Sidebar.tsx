@@ -25,6 +25,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface SidebarProps {
   activeMenu: string;
@@ -38,6 +39,7 @@ interface MenuItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
+  allowedRoles?: string[];
 }
 
 interface MenuSection {
@@ -52,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { role, userProfile, logout } = useAuth();
+  const { role, userProfile, employeeProfile, logout } = useAuth();
 
   const isOwner = role === 'OWNER';
   const isManager = role === 'MANAGER';
@@ -60,27 +62,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isInvestor = role === 'INVESTOR';
 
   const menuSections: MenuSection[] = [
-    // 1. Employee Specific Menu (Sederhana & Fokus)
+        // 1. Employee Specific Menu (Sederhana & Fokus)
     ...(isEmployee
       ? [
           {
             section: 'MENU KARYAWAN',
             items: [
-              {
+              ...(employeeProfile?.permissions?.canViewAttendance !== false ? [{
                 id: 'absensi-karyawan',
                 label: 'Absensi',
                 icon: CalendarCheck,
-              },
+              }] : []),
               {
                 id: 'kerjaan-harian',
                 label: 'Kerjaan Hari Ini',
                 icon: ClipboardList,
               },
-              {
+              ...(employeeProfile?.permissions?.canViewSampleProducts !== false ? [{
                 id: 'database-sampel',
                 label: 'Produk Sampel',
                 icon: Package,
-              },
+              }] : []),
+              ...(employeeProfile?.permissions?.canViewOmset ? [{
+                id: 'performa-harian',
+                label: 'Data Omset',
+                icon: TrendingUp,
+              }] : []),
+              ...(employeeProfile?.permissions?.canInputCommissionReal ? [{
+                id: 'input-komisi-real',
+                label: 'Input Komisi Real',
+                icon: DollarSign,
+              }] : []),
             ],
           },
         ]
@@ -347,15 +359,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   Profil Saya
                 </button>
+                
                 <button
                   onClick={() => {
                     setIsProfileMenuOpen(false);
-                    setActiveMenu('pengaturan');
+                    // Emit a custom event or set a state? The easiest is to use a global custom event or create a simple modal right here in Sidebar.
+                    window.dispatchEvent(new CustomEvent('OPEN_CHANGE_PASSWORD'));
                   }}
                   className="text-left px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  Pengaturan Akun
+                  Ubah Password
                 </button>
+
                 <button
                   onClick={async () => {
                     setIsProfileMenuOpen(false);
@@ -384,7 +399,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="text-[10px] text-emerald-400 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                {isEmployee ? 'Talent' : role} • Online
+                {isEmployee ? (employeeProfile?.position || 'Employee') : role} • Online
               </div>
             </div>
           </button>
@@ -401,6 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LogOut className="h-4 w-4" />
           </button>
         </div>
+        <ChangePasswordModal />
       </aside>
     </>
   );

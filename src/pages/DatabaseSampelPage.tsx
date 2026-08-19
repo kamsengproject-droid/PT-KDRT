@@ -88,7 +88,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   onBackToPortal,
   initialProductId,
 }) => {
-  const { userProfile, role, loading: authLoading, currentUser } = useAuth();
+  const { userProfile, role, loading: authLoading, currentUser, employeeProfile } = useAuth();
   const isOwner = role === 'OWNER';
   const isManager = role === 'MANAGER';
   const isEmployee = role === 'EMPLOYEE';
@@ -667,7 +667,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
         </div>
 
         {/* Big Action Button */}
-        {!isInvestor && (
+        {!isInvestor && (role !== 'EMPLOYEE' || employeeProfile?.permissions?.canCreateSampleProduct) && (
           <div className="relative">
             <button
               onClick={() => setShowAddChooser(true)}
@@ -699,6 +699,8 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                   </p>
 
                   <div className="grid grid-cols-1 gap-3 pt-1">
+                    {!isEmployee && (
+                    <>
                     {/* Option 1: Master Produk */}
                     <button
                       type="button"
@@ -718,6 +720,8 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                       </div>
                     </button>
 
+                    </>
+                    )}
                     {/* Option 2: Sampel Produk */}
                     <button
                       type="button"

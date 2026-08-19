@@ -10,7 +10,7 @@ import { tanggalHariIni } from '../utils/formatters';
 import { OrphanTransactionAlert } from '../components/finance/OrphanTransactionAlert';
 
 export const InputKomisiRealPage: React.FC<{ onBackToPortal?: () => void }> = ({ onBackToPortal }) => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, employeeProfile, role } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +33,24 @@ export const InputKomisiRealPage: React.FC<{ onBackToPortal?: () => void }> = ({
     const fetchAccounts = async () => {
       const q = query(collection(db, 'accounts'));
       const snap = await getDocs(q);
-      setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
+      let accs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
+      
+      // Filter for specific employee permissions
+      if (role === 'EMPLOYEE' && employeeProfile?.permissions?.canViewSpecificAccounts && employeeProfile.permissions.canViewSpecificAccounts.length > 0) {
+        accs = accs.filter(a => employeeProfile.permissions!.canViewSpecificAccounts!.includes(a.id));
+      }
+      
+      setAccounts(accs);
+      
+      // Auto-select if only 1 account
+      if (accs.length === 1) {
+        setFormData(prev => ({
+          ...prev,
+          accountId: accs[0].id,
+          accountName: accs[0].accountName,
+          scope: accs[0].scope || 'SHARING'
+        }));
+      }
       setLoading(false);
     };
     fetchAccounts();

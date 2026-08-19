@@ -1,20 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Plus,
   Sparkles,
-  Calendar,
-  User,
-  Smartphone,
-  Flame,
-  CheckCircle2,
-  FileText,
-  Clock,
   Repeat,
 } from 'lucide-react';
 import {
   DailyTask,
-  DailyTaskPriority,
   DailyTaskStatus,
   Employee,
   Account,
@@ -55,16 +47,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   );
   const [taskName, setTaskName] = useState<string>(initialTask?.taskName || '');
   const [accountId, setAccountId] = useState<string>(initialTask?.accountId || '');
+  const [unitOutput, setUnitOutput] = useState<string>(initialTask?.unitOutput || 'TAKE VIDEO');
   const [targetOutput, setTargetOutput] = useState<number>(initialTask?.targetOutput || 10);
   const [currentOutput, setCurrentOutput] = useState<number>(initialTask?.currentOutput || 0);
-  const [unitOutput, setUnitOutput] = useState<string>(initialTask?.unitOutput || 'VT');
-  const [priority, setPriority] = useState<DailyTaskPriority>(
-    initialTask?.priority || 'NORMAL'
-  );
   const [status, setStatus] = useState<DailyTaskStatus>(
     initialTask?.status || 'BELUM DIKERJAKAN'
   );
-  const [deadline, setDeadline] = useState<string>(initialTask?.deadline || '');
   const [notes, setNotes] = useState<string>(initialTask?.notes || '');
   const [isRecurring, setIsRecurring] = useState<boolean>(
     Boolean(initialTask?.isRecurring)
@@ -86,8 +74,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     if (tpl) {
       setTaskName(tpl.templateName);
       setTargetOutput(tpl.defaultTargetOutput);
-      setUnitOutput(tpl.unitOutput);
-      setPriority(tpl.defaultPriority);
+      setUnitOutput(tpl.unitOutput || 'TAKE VIDEO');
       if (tpl.accountId) setAccountId(tpl.accountId);
       if (tpl.description && !notes) setNotes(tpl.description);
     }
@@ -98,7 +85,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     setErrorMsg('');
 
     if (!taskName.trim()) {
-      setErrorMsg('Nama pekerjaan wajib diisi.');
+      setErrorMsg('Nama pekerjaan / tugas wajib diisi.');
       return;
     }
     if (!employeeId) {
@@ -111,28 +98,34 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSave(
-        {
-          tanggal,
-          employeeId,
-          employeeName: selectedEmployee?.name || 'Karyawan',
-          taskName: taskName.trim(),
-          accountId: accountId || undefined,
-          accountName: selectedAccount?.accountName || undefined,
-          targetOutput: Number(targetOutput) || 1,
-          currentOutput: Number(currentOutput) || 0,
-          unitOutput: unitOutput.trim() || 'VT',
-          priority,
-          status,
-          deadline: deadline ? deadline.trim() : undefined,
-          notes: notes.trim(),
-          isRecurring,
-          recurringFrequency: isRecurring ? recurringFrequency : undefined,
-          templateId: selectedTemplateId || undefined,
-          createdBy: initialTask?.createdBy || '',
-        },
-        isEdit
-      );
+      const payload: any = {
+        tanggal: tanggal || tanggalHariIni(),
+        employeeId,
+        employeeName: selectedEmployee?.name || 'Karyawan',
+        taskName: taskName.trim(),
+        targetOutput: Number(targetOutput) || 1,
+        currentOutput: Number(currentOutput) || 0,
+        unitOutput: unitOutput || 'TAKE VIDEO',
+        status,
+        notes: notes.trim(),
+        isRecurring,
+        createdBy: initialTask?.createdBy || '',
+      };
+
+      if (accountId) {
+        payload.accountId = accountId;
+      }
+      if (selectedAccount?.accountName) {
+        payload.accountName = selectedAccount.accountName;
+      }
+      if (isRecurring) {
+        payload.recurringFrequency = recurringFrequency;
+      }
+      if (selectedTemplateId) {
+        payload.templateId = selectedTemplateId;
+      }
+
+      await onSave(payload, isEdit);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal menyimpan tugas.');
@@ -237,7 +230,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="Contoh: NISA GROSIR88, Edit Video, Revisi VT"
+              placeholder="Contoh: TAKE VIDEO NISA GROSIR88, Edit VT Mainan"
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
               required
@@ -245,48 +238,46 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             />
           </div>
 
-          {/* Akun TikTok & Prioritas */}
+          {/* Terkait Akun TikTok */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Terkait Akun TikTok (Opsional)
+            </label>
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
+            >
+              <option value="">-- Umum / Tanpa Akun Khusus --</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.accountName} ({acc.scope})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* TUGAS HARIAN & Target Output */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Terkait Akun TikTok (Opsional)
+                TUGAS HARIAN <span className="text-rose-500">*</span>
               </label>
               <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
+                value={unitOutput}
+                onChange={(e) => setUnitOutput(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-bold text-slate-900 focus:border-orange-500 focus:outline-none"
               >
-                <option value="">-- Umum / Tanpa Akun Khusus --</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.accountName} ({acc.scope})
-                  </option>
-                ))}
+                <option value="TAKE VIDEO">TAKE VIDEO</option>
+                <option value="EDIT VIDEO">EDIT VIDEO</option>
+                <option value="UPLOAD VIDEO">UPLOAD VIDEO</option>
+                <option value="TUGAS LAINNYA">TUGAS LAINNYA</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tingkat Prioritas
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as DailyTaskPriority)}
-                className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
-              >
-                <option value="RENDAH">Rendah</option>
-                <option value="NORMAL">Normal</option>
-                <option value="TINGGI">Tinggi</option>
-                <option value="MENDESAK">Mendesak</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Target Output, Satuan & Deadline */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Target Output <span className="text-rose-500">*</span>
+                Target Output ({unitOutput === 'TAKE VIDEO' || unitOutput === 'EDIT VIDEO' || unitOutput === 'UPLOAD VIDEO' ? 'Jumlah Video' : 'Jumlah Target'}) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -297,41 +288,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-black text-slate-900 focus:border-orange-500 focus:outline-none"
               />
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Satuan Unit <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={unitOutput}
-                onChange={(e) => setUnitOutput(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
-              >
-                <option value="VT">VT (Video TikTok)</option>
-                <option value="VIDEO">VIDEO</option>
-                <option value="POSTING">POSTING</option>
-                <option value="COVER">COVER / THUMBNAIL</option>
-                <option value="PRODUK">PRODUK / KATALOG</option>
-                <option value="JAM">JAM KERJA</option>
-                <option value="KONTEN">KONTEN</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Deadline / Target Jam
-              </label>
-              <input
-                type="text"
-                placeholder="Misal: 17:00 WIB"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
-              />
-            </div>
           </div>
 
-          {/* Status (If editing) */}
+          {/* Status & Output saat ini (If editing) */}
           {isEdit && (
             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
               <div>
@@ -366,21 +325,21 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
           )}
 
-          {/* Catatan / Instruksi Khusus */}
+          {/* Catatan & Instruksi Khusus */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Catatan & Instruksi Khusus (Opsional)
+              Catatan & Instruksi (Opsional)
             </label>
             <textarea
               rows={2}
-              placeholder="Tambahkan detail arahan, link asset, atau ketentuan khusus..."
+              placeholder="Tambahkan instruksi kerja, deskripsi, atau arahan khusus..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-orange-500 focus:outline-none"
             />
           </div>
 
-          {/* Opsi Tugas Berulang */}
+          {/* Opsi Tugas Rutin */}
           <div className="rounded-2xl border border-slate-200 p-3.5 bg-slate-50 space-y-2">
             <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
               <input
@@ -390,7 +349,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 className="h-4 w-4 rounded-sm border-slate-300 text-orange-600 focus:ring-orange-500"
               />
               <Repeat className="h-3.5 w-3.5 text-slate-600" />
-              Tandai sebagai Tugas Rutin Berulang
+              Tandai sebagai Tugas Rutin Harian
             </label>
 
             {isRecurring && (
@@ -421,7 +380,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-xl bg-orange-600 px-6 py-2.5 text-xs font-black text-white hover:bg-orange-500 shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              className="rounded-xl bg-orange-600 px-6 py-2.5 text-xs font-black text-white hover:bg-orange-500 shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {isSubmitting ? (
                 'Menyimpan...'

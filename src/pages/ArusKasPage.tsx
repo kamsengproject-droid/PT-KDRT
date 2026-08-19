@@ -22,7 +22,7 @@ import {
   deleteTransaction,
 } from '../services/transactionService';
 import { deleteKomisiRealAtomic } from '../services/performanceService';
-import { formatRupiah, formatTanggal, bulanHariIni } from '../utils/formatters';
+import { formatRupiah, formatTanggal, bulanHariIni, formatBulanTahun } from '../utils/formatters';
 
 export const ArusKasPage: React.FC = () => {
   const { userProfile, role, currentUser } = useAuth();
@@ -250,7 +250,7 @@ export const ArusKasPage: React.FC = () => {
 
       {/* PRIVATE SECTION */}
       {role === 'OWNER' && (
-        renderSection('PRIVATE', 'ARUS KAS PRIBADI', <Building className="h-6 w-6 text-rose-600" />, 'text-rose-900')
+        renderSection('PRIBADI', 'ARUS KAS PRIBADI', <Building className="h-6 w-6 text-rose-600" />, 'text-rose-900')
       )}
       
       {role === 'INVESTOR' && (

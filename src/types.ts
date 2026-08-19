@@ -132,6 +132,7 @@ export type TransactionSourceType =
 export type PaymentMethod = 'CASH' | 'TRANSFER' | 'EWALLET' | 'LAINNYA';
 
 export interface Expense {
+  sourceType?: string;
   id?: string;
   date: string;
   amount: number;
@@ -149,6 +150,7 @@ export interface Expense {
   description: string;
   attachment?: string;
   receiptUrl?: string;
+  notes?: string;
   status?: TransactionStatus;
   voidReason?: string;
   createdBy?: string;
@@ -240,6 +242,17 @@ export interface Employee {
   phone?: string;
   notes?: string;
   photoUrl?: string;
+  permissions?: {
+    canViewAttendance?: boolean;
+    canManageOwnProfile?: boolean;
+    canChangeOwnPassword?: boolean;
+    canViewSampleProducts?: boolean;
+    canCreateSampleProduct?: boolean;
+    canInputCommissionReal?: boolean;
+    canViewOmset?: boolean;
+    canViewSharingOmset?: boolean;
+    canViewSpecificAccounts?: string[];
+  };
   createdAt?: any;
   updatedAt?: any;
   createdBy?: string;
@@ -258,6 +271,7 @@ export type AttendanceStatus =
 export type CheckoutStatus = 'NORMAL' | 'EARLY_CHECKOUT' | 'BELUM_PULANG';
 
 export interface AttendanceRecord {
+  userId?: string;
   id?: string;
   employeeId: string;
   employeeName?: string;

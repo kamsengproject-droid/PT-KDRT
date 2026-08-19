@@ -17,7 +17,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   className = "",
   disabled = false,
   prefix = 'Rp',
-  required = false
+  required = false,
 }) => {
   const [displayValue, setDisplayValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +27,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     
     if (value === '' || value === 0) {
       setDisplayValue("");
-    } else if (value) {
+    } else if (typeof value === 'number') {
       setDisplayValue(value.toLocaleString('id-ID'));
     }
   }, [value]);
@@ -49,13 +49,17 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
 
   return (
     <div className="relative">
-      {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">{prefix}</span>}
+      {prefix && (
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-xs pointer-events-none">
+          {prefix}
+        </span>
+      )}
       <input
         ref={inputRef}
         type="text"
         required={required}
         disabled={disabled}
-        className={`\${prefix ? 'pl-9' : 'pl-3'} \${className}`}
+        className={`${prefix ? 'pl-9' : 'pl-3'} ${className}`}
         placeholder={placeholder}
         value={displayValue}
         onChange={handleChange}

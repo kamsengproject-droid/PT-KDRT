@@ -1,116 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Lock,
-  TrendingUp,
-  DollarSign,
-  ArrowUpRight,
-  Sparkles,
-  PieChart as PieIcon,
-  ShieldCheck,
-  Filter,
-  X,
-} from 'lucide-react';
-import { subscribeDailyPerformance } from '../services/performanceService';
-import { subscribeExpenses } from '../services/expenseService';
-import { subscribeTransactions } from '../services/transactionService';
-import { FinancialTransaction, DailyPerformance, Expense } from '../types';
-import { formatBulanTahun, formatRupiah, formatTanggal, bulanHariIni } from '../utils/formatters';
-import { useAuth } from '../context/AuthContext';
+const fs = require('fs');
+let code = fs.readFileSync('src/pages/InvestorDashboardPage.tsx', 'utf8');
 
-export const DashboardPribadiPage: React.FC = () => {
-  const { userProfile, loading: authLoading, currentUser } = useAuth();
-  const [selectedMonth, setSelectedMonth] = useState<string>(bulanHariIni());
-  const [performance, setPerformance] = useState<DailyPerformance[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+// Add imports
+code = code.replace(
+  /import \{[\s\S]*?\} from 'lucide-react';/,
+  `$&
+import { Filter } from 'lucide-react';`
+);
+
+// Add states
+const stateInjection = `
   const [showIncomeDetail, setShowIncomeDetail] = useState(false);
   const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+`;
+code = code.replace(/const \[previewImageUrl, setPreviewImageUrl\] = useState<string \| null>\(null\);/, stateInjection + '\n  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);');
 
-  useEffect(() => {
-    if (authLoading || !currentUser || !userProfile?.active) {
-      return;
-    }
-    const unsubPerf = subscribeDailyPerformance('PRIBADI', setPerformance);
-    const unsubExp = subscribeExpenses('PRIBADI', setExpenses);
-    const unsubTx = subscribeTransactions({ scope: 'PRIBADI', status: 'ACTIVE' }, setTransactions);
+// Make cards clickable
+const incomeCardReplace = `
+          <div 
+            onClick={() => setShowIncomeDetail(true)}
+            className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-2xs cursor-pointer hover:bg-emerald-100/60 transition-colors"
+          >
+`;
+code = code.replace(/<div className="rounded-2xl border border-emerald-200 bg-emerald-50\/60 p-5 shadow-2xs">/, incomeCardReplace.trim());
 
-    return () => {
-      unsubPerf();
-      unsubExp();
-      unsubTx();
-    };
-  }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active]);
+const expenseCardReplace = `
+          <div 
+            onClick={() => setShowExpenseDetail(true)}
+            className="rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-2xs cursor-pointer hover:bg-rose-100/60 transition-colors"
+          >
+`;
+code = code.replace(/<div className="rounded-2xl border border-rose-200 bg-rose-50\/60 p-5 shadow-2xs">/, expenseCardReplace.trim());
 
-  const filteredPerf = performance.filter((p) => p.date.startsWith(selectedMonth));
-  const filteredExp = expenses.filter((e) => e.date.startsWith(selectedMonth));
-
-  const totalGmv = filteredPerf.reduce((sum, p) => sum + p.gmv, 0);
-  const totalKomisiKotor = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
-  const totalPengeluaran = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
-  const labaBersihPribadi = totalKomisiKotor - totalPengeluaran;
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block rounded-full bg-zinc-900 px-3 py-0.5 text-[11px] font-bold text-white uppercase tracking-wide">
-              Khusus Owner
-            </span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 flex items-center gap-2.5 mt-1">
-            <Lock className="h-6 w-6 text-zinc-800" />
-            Dashboard Bisnis Pribadi
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Rekap pendapatan GMV, komisi afiliasi pribadi, dan pengeluaran mandiri tanpa bagi hasil (100% Milik Owner).
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-zinc-200 p-1.5 shadow-2xs">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border-none bg-transparent px-2 py-1 text-xs font-bold text-zinc-900 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Main KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">GMV Akun Pribadi</span>
-          <p className="text-2xl font-extrabold text-zinc-900 mt-2">{formatRupiah(totalGmv)}</p>
-          <span className="text-[11px] text-zinc-500 font-medium">Bulan {formatBulanTahun(selectedMonth)}</span>
-        </div>
-
-        <div 
-    onClick={() => setShowIncomeDetail(true)}
-    className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-2xs cursor-pointer hover:bg-emerald-100/50 transition-colors"
-  >
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Komisi Bersih</span>
-          <p className="text-2xl font-extrabold text-emerald-800 mt-2">{formatRupiah(totalKomisiKotor)}</p>
-          <span className="text-[11px] text-emerald-700 font-medium">Masuk Kas Pribadi</span>
-        </div>
-
-        <div 
-    onClick={() => setShowExpenseDetail(true)}
-    className="rounded-2xl border border-rose-100 bg-rose-50/50 p-5 shadow-2xs cursor-pointer hover:bg-rose-100/50 transition-colors"
-  >
-          <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Pengeluaran Pribadi</span>
-          <p className="text-2xl font-extrabold text-rose-800 mt-2">{formatRupiah(totalPengeluaran)}</p>
-          <span className="text-[11px] text-rose-700 font-medium">{filteredExp.length} Transaksi</span>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-900 bg-zinc-900 p-5 text-white shadow-md">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Laba Bersih 100%</span>
-          <p className="text-2xl font-extrabold text-emerald-400 mt-2">{formatRupiah(labaBersihPribadi)}</p>
-          <span className="text-[11px] text-zinc-400 font-medium">Keuntungan Bersih Owner</span>
-        </div>
-      </div>
-
+// Render detail modals
+const renderDetailModals = `
       {/* Income Detail Modal */}
       {showIncomeDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -119,16 +42,16 @@ export const DashboardPribadiPage: React.FC = () => {
               <div>
                 <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
                   <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  SUMBER UANG MASUK PRIBADI
+                  SUMBER UANG MASUK SHARING
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
-                  Detail pendapatan untuk periode {formatBulanTahun(selectedMonth)}
+                  Detail pendapatan untuk periode {formatBulanTahun(selectedMonthStr)}
                 </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 text-right">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total Pendapatan</div>
-                  <div className="font-black text-lg">{formatRupiah(totalKomisiKotor)}</div>
+                  <div className="font-black text-lg">{formatRupiah(liveCalc?.totalIncome || 0)}</div>
                 </div>
                 <button onClick={() => setShowIncomeDetail(false)} className="rounded-full p-2 bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600">
                   <X className="h-5 w-5" />
@@ -151,12 +74,12 @@ export const DashboardPribadiPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700 bg-white">
-                  {transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME').length === 0 ? (
+                  {sharingTransactions.filter(t => t.date.startsWith(selectedMonthStr) && t.type === 'INCOME').length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
                     </tr>
                   ) : (
-                    transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'INCOME')
+                    sharingTransactions.filter(t => t.date.startsWith(selectedMonthStr) && t.type === 'INCOME')
                     .sort((a,b) => b.date.localeCompare(a.date))
                     .map((item) => (
                       <tr key={item.id} className="hover:bg-emerald-50/30 transition-colors">
@@ -190,16 +113,16 @@ export const DashboardPribadiPage: React.FC = () => {
               <div>
                 <h3 className="text-xl font-black text-rose-900 flex items-center gap-2">
                   <DollarSign className="h-6 w-6 text-rose-600" />
-                  RINCIAN UANG KELUAR PRIBADI
+                  RINCIAN UANG KELUAR SHARING
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
-                  Detail pengeluaran untuk periode {formatBulanTahun(selectedMonth)}
+                  Detail pengeluaran untuk periode {formatBulanTahun(selectedMonthStr)}
                 </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="px-4 py-2 bg-rose-50 rounded-xl border border-rose-200 text-rose-900 text-right">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total Pengeluaran</div>
-                  <div className="font-black text-lg">{formatRupiah(totalPengeluaran)}</div>
+                  <div className="font-black text-lg">{formatRupiah(liveCalc?.totalExpense || 0)}</div>
                 </div>
                 <button onClick={() => setShowExpenseDetail(false)} className="rounded-full p-2 bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600">
                   <X className="h-5 w-5" />
@@ -216,16 +139,17 @@ export const DashboardPribadiPage: React.FC = () => {
                     <th className="px-4 py-3 border-b border-zinc-200">Deskripsi</th>
                     <th className="px-4 py-3 border-b border-zinc-200">Nominal (Rp)</th>
                     <th className="px-4 py-3 border-b border-zinc-200">Metode</th>
+                    <th className="px-4 py-3 border-b border-zinc-200">Bukti</th>
                     <th className="px-4 py-3 rounded-tr-xl border-b border-zinc-200">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700 bg-white">
-                  {transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE').length === 0 ? (
+                  {sharingTransactions.filter(t => t.date.startsWith(selectedMonthStr) && t.type === 'EXPENSE').length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
+                      <td col colSpan={7} className="px-6 py-12 text-center text-zinc-400 font-medium">BELUM ADA TRANSAKSI</td>
                     </tr>
                   ) : (
-                    transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'EXPENSE')
+                    sharingTransactions.filter(t => t.date.startsWith(selectedMonthStr) && t.type === 'EXPENSE')
                     .sort((a,b) => b.date.localeCompare(a.date))
                     .map((item) => (
                       <tr key={item.id} className="hover:bg-rose-50/30 transition-colors">
@@ -236,6 +160,13 @@ export const DashboardPribadiPage: React.FC = () => {
                         <td className="px-4 py-3 text-zinc-600">{item.description}</td>
                         <td className="px-4 py-3 font-black text-rose-600">{formatRupiah(item.amount)}</td>
                         <td className="px-4 py-3"><span className="text-[10px] font-bold text-zinc-500">{item.paymentMethod || 'TRANSFER'}</span></td>
+                        <td className="px-4 py-3">
+                           {item.receiptUrl ? (
+                             <button onClick={() => setPreviewImageUrl(item.receiptUrl!)} className="text-blue-500 hover:underline font-bold text-[10px]">Lihat Bukti</button>
+                           ) : (
+                             <span className="text-zinc-400 italic text-[10px]">-</span>
+                           )}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">AKTIF</span>
                         </td>
@@ -248,7 +179,8 @@ export const DashboardPribadiPage: React.FC = () => {
           </div>
         </div>
       )}
+`;
 
-    </div>
-  );
-};
+code = code.replace(/\{previewImageUrl && \(/, renderDetailModals + '\n      {previewImageUrl && (');
+
+fs.writeFileSync('src/pages/InvestorDashboardPage.tsx', code);
