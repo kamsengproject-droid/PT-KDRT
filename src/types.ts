@@ -560,6 +560,9 @@ export interface DailyTask {
   templateId?: string;
   sampleId?: string;
   productId?: string;
+  sourceType?: string;
+  sourceId?: string;
+  scope?: ScopeType;
   createdBy: string;
   createdByName?: string;
   createdAt?: any;

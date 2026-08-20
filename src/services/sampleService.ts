@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
@@ -18,14 +19,122 @@ import {
   SampleStatus,
   ScopeType,
   DailyTask,
+  DailyTaskStatus,
+  DailyTaskPriority,
   Expense,
 } from '../types';
 import { catatAuditLog } from './auditService';
-import { createDailyTask, updateTaskOutput, selesaikanTask } from './taskService';
 import { createFinancialTransaction } from './transactionService';
 import { tanggalHariIni } from '../utils/formatters';
 
 export const SAMPLES_COLLECTION = 'samples';
+
+/**
+ * Deterministic Task Synchronizer
+ * 1 Sample = 1 Daily Task (ID: sampleTask_${sampleId})
+ * Idempotent, atomic, prevents duplicates.
+ */
+export async function syncSampleToDailyTask(
+  sampleId: string,
+  sampleData: Partial<AffiliateSample>,
+  actorUid: string,
+  actorName: string
+): Promise<string | null> {
+  const taskId = `sampleTask_${sampleId}`;
+  const taskRef = doc(db, 'dailyTasks', taskId);
+
+  // If sample is PRIBADI or has no employee assigned: remove the operational task if present
+  if (sampleData.scope === 'PRIBADI' || !sampleData.employeeId) {
+    try {
+      const snap = await getDoc(taskRef);
+      if (snap.exists()) {
+        await deleteDoc(taskRef);
+      }
+    } catch (err) {
+      console.warn('Notice removing sample task:', err);
+    }
+    return null;
+  }
+
+  // Only create/update task for SHARING samples with assigned employee
+  const target = Number(sampleData.targetContent) || 3;
+  const current = Number(sampleData.completedContent) || 0;
+  const isDone = current >= target;
+  const status: DailyTaskStatus = isDone
+    ? 'SELESAI'
+    : current > 0
+    ? 'SEDANG DIKERJAKAN'
+    : 'BELUM DIKERJAKAN';
+
+  const taskPayload: any = {
+    id: taskId,
+    taskId: taskId,
+    tanggal: sampleData.purchaseDate || tanggalHariIni(),
+    employeeId: sampleData.employeeId,
+    employeeName: sampleData.employeeName || 'Karyawan',
+    taskName: `TAKE VIDEO — ${sampleData.productName || 'Produk Sampel'}`,
+    targetOutput: target,
+    currentOutput: current,
+    unitOutput: sampleData.unitContent || 'VT',
+    status: status,
+    priority: 'NORMAL' as DailyTaskPriority,
+    sampleId: sampleId,
+    sourceType: 'SAMPLE',
+    sourceId: sampleId,
+    productId: sampleData.productId || '',
+    scope: 'SHARING',
+    notes: `Sampel produk ${sampleData.productName || ''}. Target: ${target} VT. Progress: ${current}/${target}.`,
+    updatedAt: serverTimestamp(),
+    updatedBy: actorUid,
+    updatedByName: actorName,
+  };
+
+  if (isDone) {
+    taskPayload.completedAt = serverTimestamp();
+  }
+
+  await setDoc(
+    taskRef,
+    {
+      ...taskPayload,
+      createdAt: serverTimestamp(),
+      createdBy: actorUid,
+      createdByName: actorName,
+    },
+    { merge: true }
+  );
+
+  return taskId;
+}
+
+/**
+ * Self-healing helper: Scan and sync all active SHARING samples into daily tasks
+ */
+export async function syncUnsyncedSharingSamplesToTasks(
+  actorUid: string,
+  actorName: string
+): Promise<number> {
+  try {
+    const q = query(
+      collection(db, SAMPLES_COLLECTION),
+      where('scope', '==', 'SHARING')
+    );
+    const snap = await getDocs(q);
+    let count = 0;
+
+    for (const d of snap.docs) {
+      const sample = { id: d.id, sampleId: d.id, ...d.data() } as AffiliateSample;
+      if (sample.employeeId) {
+        await syncSampleToDailyTask(sample.id, sample, actorUid, actorName);
+        count++;
+      }
+    }
+    return count;
+  } catch (err) {
+    console.warn('Auto sync sharing samples notice:', err);
+    return 0;
+  }
+}
 
 // 1. Subscribe to Samples
 export function subscribeSamples(
@@ -92,7 +201,7 @@ export async function createSample(
   const samplePrice = Number(sampleData.samplePrice) || 0;
   const quantity = Math.max(1, Number(sampleData.quantity) || 1);
   const totalCost = Number(sampleData.totalCost) || samplePrice * quantity;
-  const targetContent = Number(sampleData.targetContent) || 1;
+  const targetContent = Number(sampleData.targetContent) || 3;
   const completedContent = Number(sampleData.completedContent) || 0;
 
   const payload: any = {
@@ -103,8 +212,8 @@ export async function createSample(
     targetContent,
     completedContent,
     unitContent: sampleData.unitContent || 'VT',
-    status: sampleData.status || 'DIPESAN',
-    scope: sampleData.scope || 'PRIBADI',
+    status: sampleData.status || 'DITERIMA',
+    scope: sampleData.scope || 'SHARING',
     purchaseDate: sampleData.purchaseDate || tanggalHariIni(),
     isExpenseRecorded: false,
     createdBy: currentUserId,
@@ -134,34 +243,20 @@ export async function createSample(
       }
     }
 
-    // Optional: Auto Create Kerjaan Harian (Daily Task) for assigned employee
-    if (autoCreateTask && sampleData.employeeId && targetContent > 0) {
+    // Auto Link & Sync to Daily Task with Deterministic ID: sampleTask_${sampleId}
+    if (sampleData.scope === 'SHARING' && sampleData.employeeId) {
       try {
-        const taskId = await createDailyTask(
-          {
-            tanggal: sampleData.purchaseDate || tanggalHariIni(),
-            employeeId: sampleData.employeeId,
-            employeeName: sampleData.employeeName || 'Karyawan',
-            taskName: `Produksi Konten Sampel: ${sampleData.productName}`,
-            accountId: sampleData.accountId,
-            accountName: sampleData.accountName,
-            targetOutput: targetContent,
-            currentOutput: completedContent,
-            unitOutput: sampleData.unitContent || 'VT',
-            status: completedContent >= targetContent ? 'SELESAI' : 'BELUM DIKERJAKAN',
-            priority: 'NORMAL',
-            sampleId: sampleId,
-            productId: sampleData.productId,
-            notes: `Pembuatan konten untuk sampel produk ${sampleData.productName}. Link: ${sampleData.productUrl || '-'}`,
-            createdBy: currentUserId,
-          },
+        const taskId = await syncSampleToDailyTask(
+          sampleId,
+          { ...payload, id: sampleId },
           currentUserId,
           currentUserName
         );
-
-        await updateDoc(docRef, { taskId: taskId });
+        if (taskId) {
+          await updateDoc(docRef, { taskId: taskId });
+        }
       } catch (taskErr: any) {
-        console.warn('Auto task creation notice:', taskErr.message);
+        console.warn('Auto task sync notice:', taskErr.message);
       }
     }
 
@@ -198,6 +293,10 @@ export async function updateSample(
     const docRef = doc(db, SAMPLES_COLLECTION, id);
     await updateDoc(docRef, payload);
 
+    // Synchronize linked dailyTask deterministically (handles PIC transfer, scope changes, target changes)
+    const mergedSample = { ...currentSample, ...payload, id };
+    await syncSampleToDailyTask(id, mergedSample, currentUserId, currentUserName);
+
     await catatAuditLog(
       currentUserId,
       currentUserName,
@@ -228,6 +327,9 @@ export async function updateSampleStatus(
       updatedByName: currentUserName,
     });
 
+    const mergedSample = { ...currentSample, status: newStatus, id };
+    await syncSampleToDailyTask(id, mergedSample, currentUserId, currentUserName);
+
     await catatAuditLog(
       currentUserId,
       currentUserName,
@@ -250,7 +352,7 @@ export async function updateSampleContentProgress(
   currentUserName: string
 ): Promise<void> {
   const completed = Math.max(0, Number(newCompletedContent) || 0);
-  const target = Number(currentSample.targetContent) || 1;
+  const target = Number(currentSample.targetContent) || 3;
   const isTargetAchieved = completed >= target;
 
   try {
@@ -263,32 +365,17 @@ export async function updateSampleContentProgress(
     };
 
     // Auto-update sample status to DIGUNAKAN or SELESAI if progress advances
-    if (isTargetAchieved && currentSample.status === 'DIGUNAKAN') {
+    if (isTargetAchieved) {
       updates.status = 'SELESAI';
-    } else if (completed > 0 && currentSample.status === 'DITERIMA') {
+    } else if (completed > 0) {
       updates.status = 'DIGUNAKAN';
     }
 
     await updateDoc(docRef, updates);
 
-    // Sync with linked DailyTask if exists
-    if (currentSample.taskId) {
-      try {
-        const taskRef = doc(db, 'dailyTasks', currentSample.taskId);
-        const taskSnap = await getDoc(taskRef);
-        if (taskSnap.exists()) {
-          const taskData = taskSnap.data() as DailyTask;
-          await updateDoc(taskRef, {
-            currentOutput: completed,
-            status: isTargetAchieved ? 'SELESAI' : 'SEDANG DIKERJAKAN',
-            completedAt: isTargetAchieved ? serverTimestamp() : null,
-            updatedAt: serverTimestamp(),
-          });
-        }
-      } catch (taskSyncErr) {
-        console.warn('Sync to dailyTask notice:', taskSyncErr);
-      }
-    }
+    // Sync with linked deterministic DailyTask
+    const mergedSample = { ...currentSample, ...updates, id };
+    await syncSampleToDailyTask(id, mergedSample, currentUserId, currentUserName);
 
     await catatAuditLog(
       currentUserId,
@@ -441,15 +528,35 @@ export async function deleteSample(
     const docRef = doc(db, SAMPLES_COLLECTION, id);
     await deleteDoc(docRef);
 
+    // Delete deterministic sample task
+    const taskDocRef = doc(db, 'dailyTasks', `sampleTask_${id}`);
+    try {
+      await deleteDoc(taskDocRef);
+    } catch (err) {
+      console.warn('Notice deleting sample task:', err);
+    }
+
+    // Query any lingering tasks with sampleId == id
+    try {
+      const q = query(collection(db, 'dailyTasks'), where('sampleId', '==', id));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await deleteDoc(d.ref);
+      }
+    } catch (err) {
+      console.warn('Notice cleaning sample tasks:', err);
+    }
+
     await catatAuditLog(
       currentUserId,
       currentUserName,
       'SAMPLE_DELETED',
       `Sampel: ${currentSample.productName}`,
-      `Sampel ID ${id} dihapus.`
+      `Sampel ID ${id} dihapus beserta tugas operasional terkait.`
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${SAMPLES_COLLECTION}/${id}`);
     throw error;
   }
 }
+

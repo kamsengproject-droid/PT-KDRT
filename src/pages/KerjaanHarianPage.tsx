@@ -27,6 +27,7 @@ import {
   Check,
   CheckSquare,
   Square,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -50,6 +51,7 @@ import {
   deleteDailyTask,
   applyMelindaPresets,
 } from '../services/taskService';
+import { syncUnsyncedSharingSamplesToTasks } from '../services/sampleService';
 import { subscribeEmployees } from '../services/employeeService';
 import { subscribeAccounts } from '../services/accountService';
 import { TaskCard } from '../components/task/TaskCard';
@@ -134,6 +136,10 @@ export const KerjaanHarianPage: React.FC<KerjaanHarianPageProps> = ({ onBackToPo
     if (authLoading || !currentUser || !userProfile?.active) {
       return;
     }
+
+    // Auto-sync unlinked sharing samples in background
+    syncUnsyncedSharingSamplesToTasks(currentUserId, currentUserName).catch(() => {});
+
     setIsLoading(true);
     let unsubTasks: () => void;
 
@@ -888,128 +894,289 @@ export const KerjaanHarianPage: React.FC<KerjaanHarianPageProps> = ({ onBackToPo
         /* Sederhana & Praktis: Tampilan To-Do List */
         <div className="space-y-4">
           {isEmployee ? (
-            /* Employee Dedicated To-Do List */
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                  <CheckSquare className="h-5 w-5 text-orange-600" />
-                  Daftar To-Do Hari Ini ({filteredTasks.length} Tugas)
-                </h3>
-                <span className="text-xs font-bold text-slate-500">
-                  {filteredTasks.filter((t) => t.status === 'SELESAI').length}/{filteredTasks.length} Selesai
-                </span>
-              </div>
+            /* Employee Dedicated To-Do List with Dedicated Sample Section */
+            (() => {
+              const sampleTasks = filteredTasks.filter(
+                (t) => (t.sourceType === 'SAMPLE' || Boolean(t.sampleId)) && t.status !== 'SELESAI' && (t.currentOutput || 0) < (t.targetOutput || 1)
+              );
+              const manualTasks = filteredTasks.filter(
+                (t) => !(t.sourceType === 'SAMPLE' || Boolean(t.sampleId)) && t.status !== 'SELESAI'
+              );
+              const completedTasks = filteredTasks.filter(
+                (t) => t.status === 'SELESAI' || (t.currentOutput || 0) >= (t.targetOutput || 1)
+              );
 
-              <div className="divide-y divide-slate-100">
-                {filteredTasks.map((task) => {
-                  const isDone = task.status === 'SELESAI';
-                  const target = task.targetOutput || 1;
-                  const current = task.currentOutput || 0;
-                  const percent = Math.min(100, Math.round((current / target) * 100));
-
-                  return (
-                    <div
-                      key={task.id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between py-3.5 px-2 gap-3 transition-colors rounded-xl ${
-                        isDone ? 'bg-emerald-50/30' : 'hover:bg-slate-50'
-                      }`}
-                    >
-                      {/* Checkbox and Task Title */}
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <button
-                          onClick={() => {
-                            if (isDone) {
-                              handleOverrideStatus(task, 'SEDANG DIKERJAKAN');
-                            } else {
-                              handleCompleteTask(task);
-                            }
-                          }}
-                          className="mt-0.5 text-orange-600 hover:text-orange-700 transition-colors shrink-0"
-                          title={isDone ? 'Buka kembali' : 'Tandai Selesai'}
-                        >
-                          {isDone ? (
-                            <CheckSquare className="h-6 w-6 text-emerald-600" />
-                          ) : (
-                            <Square className="h-6 w-6 text-slate-400 hover:text-orange-600" />
-                          )}
-                        </button>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              onClick={() => setDetailTask(task)}
-                              className={`text-sm font-bold cursor-pointer transition-colors ${
-                                isDone
-                                  ? 'line-through text-slate-400'
-                                  : 'text-slate-900 hover:text-orange-600'
-                              }`}
-                            >
-                              {task.taskName} — {target} {task.unitOutput || 'VT'}
-                            </span>
-
-                            {task.accountName && (
-                              <span className="rounded-md bg-zinc-900 text-white font-extrabold text-[10px] px-2 py-0.5">
-                                {task.accountName}
-                              </span>
-                            )}
-
-                            <span
-                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                                isDone
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : task.status === 'SEDANG DIKERJAKAN'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {isDone ? 'SELESAI' : 'BELUM SELESAI'}
-                            </span>
-                          </div>
-
-                          {/* Output Subtext */}
-                          <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
-                            <span>
-                              Output:{' '}
-                              <strong className="text-slate-800 font-bold">
-                                {current} / {target} {task.unitOutput || 'VT'}
-                              </strong>{' '}
-                              ({percent}%)
-                            </span>
-                            {task.startedAt && (
-                              <span className="text-[11px]">Mulai: {formatJamWIB(task.startedAt)}</span>
-                            )}
-                            {task.completedAt && (
-                              <span className="text-[11px] text-emerald-700">
-                                Selesai: {formatJamWIB(task.completedAt)}
-                              </span>
-                            )}
-                          </div>
+              return (
+                <div className="space-y-4">
+                  {/* 1. SECTION: SAMPEL BELUM DIKONTENKAN */}
+                  <div className="rounded-2xl border border-orange-200 bg-orange-50/20 p-4 sm:p-6 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-orange-100 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-600 text-white shadow-xs">
+                          <Package className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                            SAMPEL BELUM DIKONTENKAN
+                          </h3>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Produk sampel Sharing yang sudah diterima dan wajib diproduksi kontennya
+                          </p>
                         </div>
                       </div>
+                      <span className="rounded-full bg-orange-100 text-orange-800 text-[11px] font-black px-3 py-1 border border-orange-200">
+                        {sampleTasks.length} Sampel
+                      </span>
+                    </div>
 
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {!isDone && (
-                          <button
-                            onClick={() => setOutputModalTask(task)}
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                          >
-                            + Update Output
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setDetailTask(task)}
-                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
-                          Detail
-                        </button>
+                    {sampleTasks.length === 0 ? (
+                      <div className="text-center py-6 text-xs text-slate-400 font-medium bg-white/60 rounded-xl border border-dashed border-orange-200">
+                        🎉 Semua sampel Sharing sudah selesai diproduksi! Tidak ada antrean sampel.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-orange-100/60">
+                        {sampleTasks.map((task) => {
+                          const target = task.targetOutput || 3;
+                          const current = task.currentOutput || 0;
+                          const percent = Math.min(100, Math.round((current / target) * 100));
+
+                          return (
+                            <div
+                              key={task.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between py-3.5 px-2 gap-3 transition-colors rounded-xl bg-white hover:bg-orange-50/40 p-3 border border-orange-100/80 mb-2 shadow-2xs"
+                            >
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <button
+                                  onClick={() => handleCompleteTask(task)}
+                                  className="mt-0.5 text-orange-600 hover:text-orange-700 transition-colors shrink-0"
+                                  title="Tandai Selesai"
+                                >
+                                  <Square className="h-6 w-6 text-orange-400 hover:text-orange-600" />
+                                </button>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      onClick={() => setDetailTask(task)}
+                                      className="text-sm font-black text-slate-900 hover:text-orange-600 cursor-pointer transition-colors"
+                                    >
+                                      {task.taskName}
+                                    </span>
+
+                                    <span className="rounded-md bg-orange-100 text-orange-800 font-extrabold text-[10px] px-2 py-0.5 border border-orange-200">
+                                      SAMPEL SHARING
+                                    </span>
+
+                                    {task.accountName && (
+                                      <span className="rounded-md bg-zinc-900 text-white font-extrabold text-[10px] px-2 py-0.5">
+                                        {task.accountName}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-xs text-slate-600 mt-1.5 flex flex-wrap items-center gap-3 font-medium">
+                                    <span>
+                                      Target:{' '}
+                                      <strong className="text-slate-900 font-bold">
+                                        {target} {task.unitOutput || 'VT'}
+                                      </strong>
+                                    </span>
+                                    <span>•</span>
+                                    <span>
+                                      Progress:{' '}
+                                      <strong className="text-orange-600 font-black">
+                                        {current} / {target} {task.unitOutput || 'VT'}
+                                      </strong>
+                                    </span>
+                                  </div>
+
+                                  {/* Progress bar */}
+                                  <div className="w-full max-w-md bg-slate-100 h-2 rounded-full overflow-hidden mt-2 border border-slate-200/50">
+                                    <div
+                                      className="bg-orange-500 h-full rounded-full transition-all duration-300"
+                                      style={{ width: `${percent}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                <button
+                                  onClick={() => setOutputModalTask(task)}
+                                  className="rounded-xl border border-orange-300 bg-orange-500 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-orange-600 shadow-xs transition-colors"
+                                >
+                                  + Update Output
+                                </button>
+                                <button
+                                  onClick={() => setDetailTask(task)}
+                                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. SECTION: TUGAS OPERASIONAL LAINNYA */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 text-white shadow-xs">
+                          <CheckSquare className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-slate-900">
+                            TUGAS OPERASIONAL LAINNYA
+                          </h3>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Pekerjaan harian & to-do reguler non-sampel
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold px-3 py-1">
+                        {manualTasks.length} Tugas
+                      </span>
+                    </div>
+
+                    {manualTasks.length === 0 ? (
+                      <div className="text-center py-6 text-xs text-slate-400 font-medium">
+                        Tidak ada tugas operasional harian lainnya yang aktif.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {manualTasks.map((task) => {
+                          const target = task.targetOutput || 1;
+                          const current = task.currentOutput || 0;
+                          const percent = Math.min(100, Math.round((current / target) * 100));
+
+                          return (
+                            <div
+                              key={task.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between py-3.5 px-2 gap-3 transition-colors rounded-xl hover:bg-slate-50"
+                            >
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <button
+                                  onClick={() => handleCompleteTask(task)}
+                                  className="mt-0.5 text-orange-600 hover:text-orange-700 transition-colors shrink-0"
+                                  title="Tandai Selesai"
+                                >
+                                  <Square className="h-6 w-6 text-slate-400 hover:text-orange-600" />
+                                </button>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      onClick={() => setDetailTask(task)}
+                                      className="text-sm font-bold text-slate-900 hover:text-orange-600 cursor-pointer transition-colors"
+                                    >
+                                      {task.taskName} — {target} {task.unitOutput || 'VT'}
+                                    </span>
+
+                                    {task.accountName && (
+                                      <span className="rounded-md bg-zinc-900 text-white font-extrabold text-[10px] px-2 py-0.5">
+                                        {task.accountName}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
+                                    <span>
+                                      Output:{' '}
+                                      <strong className="text-slate-800 font-bold">
+                                        {current} / {target} {task.unitOutput || 'VT'}
+                                      </strong>{' '}
+                                      ({percent}%)
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                <button
+                                  onClick={() => setOutputModalTask(task)}
+                                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                  + Update Output
+                                </button>
+                                <button
+                                  onClick={() => setDetailTask(task)}
+                                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. SECTION: PEKERJAAN SELESAI */}
+                  {completedTasks.length > 0 && (
+                    <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/20 p-4 sm:p-5 shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between border-b border-emerald-100 pb-2.5">
+                        <h4 className="font-black text-xs text-emerald-900 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          PEKERJAAN SELESAI ({completedTasks.length})
+                        </h4>
+                      </div>
+
+                      <div className="divide-y divide-emerald-100/60">
+                        {completedTasks.map((task) => {
+                          const target = task.targetOutput || 1;
+                          const current = task.currentOutput || target;
+
+                          return (
+                            <div
+                              key={task.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 px-2 gap-2 rounded-xl transition-colors bg-emerald-50/40"
+                            >
+                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                <button
+                                  onClick={() => handleOverrideStatus(task, 'SEDANG DIKERJAKAN')}
+                                  className="mt-0.5 text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
+                                  title="Buka kembali"
+                                >
+                                  <CheckSquare className="h-5 w-5 text-emerald-600" />
+                                </button>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      onClick={() => setDetailTask(task)}
+                                      className="text-xs font-bold line-through text-slate-400 cursor-pointer"
+                                    >
+                                      {task.taskName}
+                                    </span>
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                      SELESAI ({current}/{target} {task.unitOutput || 'VT'})
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => setDetailTask(task)}
+                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                              >
+                                Detail
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  )}
+                </div>
+              );
+            })()
           ) : (
+
             /* Owner / Manager View: Grouped To-Do Lists by Employee */
             <div className="space-y-4">
               {employeeSummaries.map((emp) => {

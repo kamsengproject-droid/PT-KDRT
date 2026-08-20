@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, AlertTriangle, X, UploadCloud } from 'lucide-react';
 
 export interface SelfiePhotoMetadata {
   dataUrl: string;
@@ -23,6 +23,7 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
   title = 'Ambil Foto Selfie Langsung',
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [photoMeta, setPhotoMeta] = useState<SelfiePhotoMetadata | null>(null);
@@ -51,44 +52,95 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
     setCameraError(null);
     stopCamera();
 
+    // Check if mediaDevices is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn('[CAMERA_DEBUG] navigator.mediaDevices.getUserMedia is not supported on this browser');
+      setCameraError(
+        'Browser atau perangkat Anda tidak mendukung akses live stream kamera. Silakan gunakan tombol Ambil dari Kamera HP di bawah.'
+      );
+      setIsInitializing(false);
+      return;
+    }
+
     try {
       const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: facingMode,
+          facingMode: { ideal: facingMode },
           width: { ideal: 640 },
           height: { ideal: 640 },
         },
         audio: false,
       };
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (errFirst: any) {
+        console.warn('[CAMERA_DEBUG] Primary constraints failed, retrying with fallback:', errFirst);
+        // Fallback constraint
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn('[CAMERA_DEBUG] Video play catch:', playErr);
+        }
       }
       setIsInitializing(false);
     } catch (err: any) {
-      console.warn('Gagal mengakses kamera:', err);
-      setCameraError(
-        'Kamera diperlukan untuk melakukan selfie absensi. Pastikan izin kamera telah diberikan di browser Anda.'
-      );
+      console.error('[CAMERA_DEBUG] Gagal mengakses kamera:', err);
+      let errMsg = 'Kamera tidak dapat diakses. Izinkan akses kamera lalu coba lagi.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errMsg = 'Izin kamera ditolak. Silakan berikan izin akses kamera pada browser Anda lalu tekan tombol Coba Lagi.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errMsg = 'Perangkat kamera tidak ditemukan pada HP/Laptop Anda.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errMsg = 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi lain lalu coba lagi.';
+      }
+      setCameraError(errMsg);
       setIsInitializing(false);
     }
   };
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (_) {}
+      });
       setStream(null);
     }
+  };
+
+  const processDataUrl = (dataUrl: string, width: number, height: number) => {
+    const stringLength = dataUrl.length - 'data:image/jpeg;base64,'.length;
+    const sizeBytes = Math.round((stringLength * 3) / 4);
+
+    const metadata: SelfiePhotoMetadata = {
+      dataUrl,
+      width,
+      height,
+      sizeBytes,
+      mimeType: 'image/jpeg',
+    };
+
+    setPhotoMeta(metadata);
+    setCapturedImage(dataUrl);
+    stopCamera();
   };
 
   const takeSnapshot = () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
-    
-    // Calculate 480p max dimension (longest edge <= 480px)
+
     const rawW = video.videoWidth || 640;
     const rawH = video.videoHeight || 480;
     const maxDim = 480;
@@ -113,39 +165,53 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Flip horizontal if front facing user for natural mirror look
     if (facingMode === 'user') {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Compress to JPEG 75% quality for lightweight 100-300KB storage
     const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+    processDataUrl(dataUrl, targetW, targetH);
+  };
 
-    // Approximate size in bytes from base64
-    const stringLength = dataUrl.length - 'data:image/jpeg;base64,'.length;
-    const sizeBytes = Math.round((stringLength * 3) / 4);
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // 10MB hard limit validation
-    const maxSizeBytes = 10 * 1024 * 1024;
-    if (sizeBytes > maxSizeBytes) {
-      setCameraError('Ukuran foto terlalu besar. Silakan ambil foto kembali.');
-      return;
-    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 480;
+        let targetW = img.width;
+        let targetH = img.height;
 
-    const metadata: SelfiePhotoMetadata = {
-      dataUrl,
-      width: targetW,
-      height: targetH,
-      sizeBytes,
-      mimeType: 'image/jpeg',
+        if (img.width >= img.height) {
+          if (img.width > maxDim) {
+            targetW = maxDim;
+            targetH = Math.round((img.height * maxDim) / img.width);
+          }
+        } else {
+          if (img.height > maxDim) {
+            targetH = maxDim;
+            targetW = Math.round((img.width * maxDim) / img.height);
+          }
+        }
+
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          processDataUrl(dataUrl, targetW, targetH);
+        }
+      };
+      img.src = event.target?.result as string;
     };
-
-    setPhotoMeta(metadata);
-    setCapturedImage(dataUrl);
-    stopCamera();
+    reader.readAsDataURL(file);
   };
 
   const handleRetake = () => {
@@ -166,6 +232,16 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl border border-zinc-800 text-white flex flex-col">
+        {/* Hidden Fallback Camera File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -185,15 +261,23 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
         {/* Camera Preview / Captured Picture */}
         <div className="relative aspect-square w-full bg-black flex items-center justify-center overflow-hidden">
           {cameraError ? (
-            <div className="p-6 text-center text-zinc-300">
-              <AlertTriangle className="mx-auto h-12 w-12 text-amber-400 mb-3" />
-              <p className="text-sm leading-relaxed mb-4">{cameraError}</p>
-              <button
-                onClick={startCamera}
-                className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-xs font-semibold hover:bg-zinc-700 text-white transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" /> Coba Lagi
-              </button>
+            <div className="p-6 text-center text-zinc-300 space-y-4">
+              <AlertTriangle className="mx-auto h-12 w-12 text-amber-400" />
+              <p className="text-sm leading-relaxed text-zinc-200">{cameraError}</p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={startCamera}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-xs font-semibold hover:bg-zinc-700 text-white transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" /> Coba Lagi
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold hover:bg-emerald-500 text-white transition-colors shadow-md"
+                >
+                  <UploadCloud className="h-4 w-4" /> Ambil dari Kamera HP
+                </button>
+              </div>
             </div>
           ) : capturedImage ? (
             <div className="relative h-full w-full">
@@ -254,7 +338,7 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'))}
@@ -272,6 +356,15 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
               >
                 <Camera className="h-5 w-5" /> Ambil Foto Sekarang
               </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-xl border border-zinc-800 bg-zinc-800/80 p-3 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+                title="Pilih Kamera HP"
+              >
+                <UploadCloud className="h-5 w-5" />
+              </button>
             </div>
           )}
         </div>
@@ -279,3 +372,4 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
     </div>
   );
 };
+

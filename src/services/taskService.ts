@@ -10,6 +10,7 @@ import {
   orderBy,
   serverTimestamp,
   getDocs,
+  getDoc,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, handleFirestoreError, OperationType } from '../firebase';
@@ -72,12 +73,14 @@ export function subscribeDailyTasks(
         return timeB - timeA;
       });
 
-      // Client-side filtering if composite indexing is pending
-      if (filters?.employeeId) {
-        tasks = tasks.filter((t) => t.employeeId === filters.employeeId);
-      }
-      if (filters?.status && filters.status !== 'SEMUA') {
-        tasks = tasks.filter((t) => t.status === filters.status);
+      if (filters?.tanggal) {
+        tasks = tasks.filter((t) => {
+          if (t.tanggal === filters.tanggal) return true;
+          const isSampleTask = t.sourceType === 'SAMPLE' || Boolean(t.sampleId);
+          const isUnfinished = t.status !== 'SELESAI' && (t.currentOutput || 0) < (t.targetOutput || 1);
+          if (isSampleTask && isUnfinished) return true;
+          return false;
+        });
       }
 
       if (callback) callback(tasks);
@@ -146,7 +149,13 @@ export function subscribeDailyTasksByEmployee(
       }
 
       if (tanggal) {
-        tasks = tasks.filter((t) => t.tanggal === tanggal);
+        tasks = tasks.filter((t) => {
+          if (t.tanggal === tanggal) return true;
+          const isSampleTask = t.sourceType === 'SAMPLE' || Boolean(t.sampleId);
+          const isUnfinished = t.status !== 'SELESAI' && (t.currentOutput || 0) < (t.targetOutput || 1);
+          if (isSampleTask && isUnfinished) return true;
+          return false;
+        });
       }
 
       if (callback) callback(tasks);
@@ -292,15 +301,47 @@ export async function updateTaskOutput(
   try {
     const taskRef = doc(db, TASKS_COLLECTION, taskId);
     const validatedOutput = Math.max(0, Number(newOutput) || 0);
+    const target = currentTask.targetOutput || 1;
+    const isAchieved = validatedOutput >= target;
 
     const updates: any = {
       currentOutput: validatedOutput,
+      status: isAchieved
+        ? ('SELESAI' as DailyTaskStatus)
+        : validatedOutput > 0
+        ? ('SEDANG DIKERJAKAN' as DailyTaskStatus)
+        : currentTask.status,
       updatedAt: serverTimestamp(),
       updatedBy: actorUid,
       updatedByName: actorName,
     };
+    if (isAchieved && !currentTask.completedAt) {
+      updates.completedAt = serverTimestamp();
+    }
 
     await updateDoc(taskRef, updates);
+
+    // Sync back to linked sample document if exists
+    if (currentTask.sampleId) {
+      try {
+        const sampleRef = doc(db, 'samples', currentTask.sampleId);
+        const sampleSnap = await getDoc(sampleRef);
+        if (sampleSnap.exists()) {
+          const sampleData = sampleSnap.data();
+          const sampleTarget = Number(sampleData.targetContent) || target;
+          const sampleDone = validatedOutput >= sampleTarget;
+          await updateDoc(sampleRef, {
+            completedContent: validatedOutput,
+            status: sampleDone ? 'SELESAI' : validatedOutput > 0 ? 'DIGUNAKAN' : sampleData.status || 'DITERIMA',
+            updatedAt: serverTimestamp(),
+            updatedBy: actorUid,
+            updatedByName: actorName,
+          });
+        }
+      } catch (sErr) {
+        console.warn('Sync back to sample notice:', sErr);
+      }
+    }
 
     await catatAuditLog(
       actorUid,
@@ -330,7 +371,7 @@ export async function selesaikanTask(
 ): Promise<void> {
   try {
     const taskRef = doc(db, TASKS_COLLECTION, taskId);
-    const output = finalOutput !== undefined ? Math.max(0, Number(finalOutput)) : currentTask.currentOutput;
+    const output = finalOutput !== undefined ? Math.max(0, Number(finalOutput)) : (currentTask.targetOutput || currentTask.currentOutput);
 
     const updates: any = {
       status: 'SELESAI' as DailyTaskStatus,
@@ -342,6 +383,22 @@ export async function selesaikanTask(
     };
 
     await updateDoc(taskRef, updates);
+
+    // Sync back to linked sample document if exists
+    if (currentTask.sampleId) {
+      try {
+        const sampleRef = doc(db, 'samples', currentTask.sampleId);
+        await updateDoc(sampleRef, {
+          completedContent: output,
+          status: 'SELESAI',
+          updatedAt: serverTimestamp(),
+          updatedBy: actorUid,
+          updatedByName: actorName,
+        });
+      } catch (sErr) {
+        console.warn('Sync back to sample notice:', sErr);
+      }
+    }
 
     await catatAuditLog(
       actorUid,
@@ -357,6 +414,7 @@ export async function selesaikanTask(
     throw error;
   }
 }
+
 
 /**
  * JEDA / TERTUNDA
