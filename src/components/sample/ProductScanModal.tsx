@@ -44,7 +44,7 @@ interface ProductScanModalProps {
   onScanExtracted?: (scanResult: AIScanResult) => void;
 }
 
-const KATEGORI_OPTIONS = [
+export const MASTER_KATEGORI_OPTIONS = [
   'Skincare & Kecantikan',
   'Fashion & Pakaian',
   'Mainan & Hobi',
@@ -55,6 +55,13 @@ const KATEGORI_OPTIONS = [
   'Makanan & Minuman',
   'Kesehatan & Kebugaran',
   'Lainnya',
+];
+
+export const EMPLOYEE_KATEGORI_OPTIONS = [
+  'Fashion Kaos',
+  'Fashion Setelan',
+  'Fashion Batik',
+  'Fashion Celana',
 ];
 
 export const ProductScanModal: React.FC<ProductScanModalProps> = ({
@@ -69,6 +76,8 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
   onProductCreated,
   onScanExtracted,
 }) => {
+  const activeCategoryOptions = canChooseScope ? MASTER_KATEGORI_OPTIONS : EMPLOYEE_KATEGORI_OPTIONS;
+
   // Step state: 'UPLOAD' | 'SCANNING' | 'REVIEW' | 'SUCCESS'
   const [step, setStep] = useState<'UPLOAD' | 'SCANNING' | 'REVIEW' | 'SUCCESS'>('UPLOAD');
 
@@ -87,7 +96,7 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
   const [productName, setProductName] = useState<string>('');
   const [productPrice, setProductPrice] = useState<number>(0);
   const [platform, setPlatform] = useState<'TikTok' | 'Shopee' | 'MANUAL'>('TikTok');
-  const [category, setCategory] = useState<string>('Skincare & Kecantikan');
+  const [category, setCategory] = useState<string>(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [scope, setScope] = useState<ScopeType>(defaultScope);
   const [commissionRate, setCommissionRate] = useState<number | ''>(''); // Left empty by default
@@ -121,7 +130,7 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
       setProductName('');
       setProductPrice(0);
       setPlatform('TikTok');
-      setCategory('Skincare & Kecantikan');
+      setCategory(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
       setSelectedAccountIds(accounts.length > 0 ? [accounts[0].id || ''] : []);
       setScope(defaultScope);
       setCommissionRate('');
@@ -180,10 +189,10 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
       setProductName(result.productName || '');
       setProductPrice(result.productPrice || 0);
       setPlatform(result.platform || 'TikTok');
-      if (result.category && KATEGORI_OPTIONS.includes(result.category)) {
+      if (result.category && activeCategoryOptions.includes(result.category)) {
         setCategory(result.category);
       } else {
-        setCategory('Skincare & Kecantikan');
+        setCategory(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
       }
 
       // Build initial notes from variants or recommendation
@@ -696,7 +705,7 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full rounded-2xl border border-zinc-300 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   >
-                    {KATEGORI_OPTIONS.map((cat) => (
+                    {activeCategoryOptions.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>

@@ -50,20 +50,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shrink-0">
-      {/* Left: Mobile Toggle & Horizontal Logo [ KD ] KANTOR PT.KDRT [ ROLE ] */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
+    <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-6 shrink-0">
+      {/* Left: Mobile Toggle & Horizontal Logo [ hamburger ] [ logo ] KANTOR PT.KDRT */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <button
           onClick={onToggleSidebar}
-          className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden transition-colors"
+          className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
           title="Buka Navigasi"
+          aria-label="Menu"
         >
           <Menu className="h-4 w-4" />
         </button>
 
         <button
           onClick={() => setActiveMenu('portal')}
-          className="flex items-center gap-2 text-left group shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 text-left group shrink-0"
         >
           <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-orange-500 text-white font-black text-xs shadow-2xs group-hover:bg-orange-600 transition-colors shrink-0">
             KD
@@ -71,28 +72,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight group-hover:text-orange-600 transition-colors whitespace-nowrap">
             KANTOR PT.KDRT
           </span>
-          <span
-            className={`hidden xs:inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${getRoleBadgeClass(
-              role
-            )}`}
-          >
-            {role}
-          </span>
         </button>
       </div>
 
-      {/* Right: Nama User, Role, Status Firebase Online, Avatar */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Status Firebase Online */}
-        <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+      {/* Right: [ avatar ] [ ROLE/EMPLOYEE ] [ logout ] */}
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Status Firebase Online (Desktop) */}
+        <div className="hidden md:flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>Firebase Online</span>
         </div>
 
-        {/* User Info Display */}
+        {/* User Info Display: Avatar & Badge */}
         <button
           onClick={() => setActiveMenu(role === 'EMPLOYEE' ? 'data-saya' : 'profil-saya')}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 pr-2.5 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-slate-100 transition-colors cursor-pointer text-left"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1 sm:p-1.5 sm:pr-2.5 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-slate-100 transition-colors cursor-pointer text-left shrink-0"
           title="Buka Profil Saya"
         >
           {/* Avatar */}
@@ -100,25 +94,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img
               src={userProfile.photoUrl}
               alt={userProfile?.name || 'User'}
-              className="h-7 w-7 rounded-lg object-cover border border-slate-300 shadow-2xs"
+              className="h-7 w-7 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0"
             />
           ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shadow-2xs">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shadow-2xs shrink-0">
               {getAvatarInitials(userProfile?.name)}
             </div>
           )}
 
-          <div className="hidden md:flex flex-col text-left">
-            <span className="text-xs font-bold text-slate-900 truncate max-w-[120px]">
+          <div className="hidden sm:flex flex-col text-left">
+            <span className="text-xs font-bold text-slate-900 truncate max-w-[110px]">
               {userProfile?.name || 'User'}
             </span>
-            <span className="text-[10px] font-semibold text-slate-500 uppercase">
+            <span className="text-[9px] font-semibold text-slate-500 uppercase">
               {role === 'EMPLOYEE' ? 'Talent' : role}
             </span>
           </div>
 
           <span
-            className={`rounded-md border px-1.5 py-0.2 text-[9px] font-extrabold uppercase ${getRoleBadgeClass(
+            className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${getRoleBadgeClass(
               role
             )}`}
           >
@@ -133,10 +127,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               await logout();
             }
           }}
-          className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1.5 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+          className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-2 sm:px-2.5 py-1.5 text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0 min-h-[36px]"
           title="Keluar dari akun (Logout)"
+          aria-label="Logout"
         >
-          <LogOut className="h-3.5 w-3.5" />
+          <LogOut className="h-3.5 w-3.5 shrink-0" />
           <span className="hidden sm:inline">Keluar</span>
         </button>
       </div>

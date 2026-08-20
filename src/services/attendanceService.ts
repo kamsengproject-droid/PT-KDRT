@@ -11,7 +11,7 @@ import {
   where,
   orderBy,
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, handleFirestoreError, OperationType } from '../firebase';
 import { AttendanceRecord, AttendanceStatus, CheckoutStatus, Holiday, WorkplaceSchedule, OfficeLocation } from '../types';
 import { hitungMenitTerlambat, hitungStatusPulang, getJadwalHari, cekHariLibur, DEFAULT_SCHEDULE } from '../utils/attendanceCalc';
@@ -19,12 +19,31 @@ import { validasiGeofence } from '../utils/geofence';
 import { catatAuditLog } from './auditService';
 import { formatJamPendek, tanggalHariIni } from '../utils/formatters';
 
+export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string } {
+  try {
+    const parts = dataUrl.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return { blob: new Blob([u8arr], { type: mimeType }), mimeType };
+  } catch (err) {
+    console.error('[ATTENDANCE_IMAGE_ERROR] Failed converting dataUrl to Blob:', err);
+    throw new Error('Format foto tidak valid. Silakan ulangi pengambilan selfie.');
+  }
+}
+
 // Upload selfie image (base64 data URL) to Firebase Storage
 export async function uploadSelfieStorage(
   employeeId: string,
   tanggal: string,
   type: 'checkin' | 'checkout',
-  dataUrl: string
+  dataUrl: string,
+  onProgress?: (msg: string) => void
 ): Promise<{
   photoUrl: string;
   storagePath: string;
@@ -33,27 +52,35 @@ export async function uploadSelfieStorage(
   photoSizeBytes: number;
   photoMimeType: string;
 }> {
-  // Approximate size from base64
-  const stringLength = dataUrl.length - 'data:image/jpeg;base64,'.length;
-  const photoSizeBytes = Math.max(1024, Math.round((stringLength * 3) / 4));
-  const photoMimeType = 'image/jpeg';
-  const photoWidth = 480;
+  if (onProgress) onProgress('Mengompres foto...');
+
+  let blob: Blob;
+  let photoMimeType = 'image/jpeg';
+  try {
+    const converted = dataUrlToBlob(dataUrl);
+    blob = converted.blob;
+    photoMimeType = converted.mimeType;
+  } catch (err: any) {
+    console.error('[ATTENDANCE_IMAGE_ERROR]', err);
+    throw new Error('Gagal memproses foto selfie. Silakan coba lagi.');
+  }
+
+  const photoSizeBytes = blob.size;
+  const photoWidth = 640;
   const photoHeight = 480;
 
-  if (photoSizeBytes > 10 * 1024 * 1024) {
+  if (photoSizeBytes > 5 * 1024 * 1024) {
     throw new Error('Ukuran foto terlalu besar. Silakan ambil foto kembali.');
   }
 
-  const timestamp = Date.now();
-  const cleanDate = tanggal.replace(/-/g, '');
-  const fileName = `${employeeId}_${tanggal}_${type === 'checkin' ? 'checkin' : 'checkout'}_${timestamp}.jpg`;
   const storagePath = `attendance/${employeeId}/${tanggal}/${type === 'checkin' ? 'check-in' : 'check-out'}.jpg`;
+
+  if (onProgress) onProgress('Menyimpan foto...');
 
   try {
     const fileRef = ref(storage, storagePath);
-    // Upload base64 compressed JPEG
-    await uploadString(fileRef, dataUrl, 'data_url', {
-      contentType: 'image/jpeg',
+    await uploadBytes(fileRef, blob, {
+      contentType: photoMimeType,
       customMetadata: {
         employeeId,
         date: tanggal,
@@ -70,16 +97,12 @@ export async function uploadSelfieStorage(
       photoSizeBytes,
       photoMimeType,
     };
-  } catch (error) {
-    console.warn('Storage upload notice, saving data reference:', error);
-    return {
-      photoUrl: dataUrl,
-      storagePath,
-      photoWidth,
-      photoHeight,
-      photoSizeBytes,
-      photoMimeType,
-    };
+  } catch (error: any) {
+    console.error('[ATTENDANCE_STORAGE_ERROR]', {
+      code: error?.code || 'STORAGE_UPLOAD_ERROR',
+      message: error?.message || 'Storage upload error',
+    });
+    throw new Error('Gagal mengupload foto selfie ke cloud storage. Periksa koneksi internet Anda.');
   }
 }
 
@@ -97,6 +120,7 @@ export interface AbsenMasukParams {
   currentUserId: string;
   currentUserName: string;
   customTimeStr?: string; // for testing or specific time
+  onProgress?: (msg: string) => void;
 }
 
 export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<AttendanceRecord> {
@@ -193,8 +217,10 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     menitTerlambat = calc.menitTerlambat;
   }
 
-  // 4. Upload photo to Firebase Storage with 480p JPEG validation
-  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkin', fotoBase64);
+  // 4. Upload photo to Firebase Storage
+  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkin', fotoBase64, params.onProgress);
+
+  if (params.onProgress) params.onProgress('Menyimpan absensi...');
 
   // 5. Save attendance record to Firestore with serverTimestamp
   const recordData: any = {
@@ -268,6 +294,7 @@ export interface AbsenPulangParams {
   currentUserId: string;
   currentUserName: string;
   customTimeStr?: string;
+  onProgress?: (msg: string) => void;
 }
 
 export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<AttendanceRecord> {
@@ -284,6 +311,7 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     currentUserId,
     currentUserName,
     customTimeStr,
+    onProgress,
   } = params;
 
   const today = tanggalHariIni();
@@ -365,7 +393,9 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
   );
 
   // 4. Upload photo to Firebase Storage
-  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkout', fotoBase64);
+  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkout', fotoBase64, onProgress);
+
+  if (onProgress) onProgress('Menyimpan absensi...');
 
   const updateData: any = {
     checkOutAt: serverTimestamp(),

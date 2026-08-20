@@ -31,12 +31,15 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
       setCapturedImage(null);
       setPhotoMeta(null);
       setCameraError(null);
+      setIsProcessing(false);
       return;
     }
 
@@ -138,75 +141,104 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
   };
 
   const takeSnapshot = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
+    if (!videoRef.current || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      const video = videoRef.current;
+      const rawW = video.videoWidth || 640;
+      const rawH = video.videoHeight || 480;
+      const maxDim = 640;
+      let targetW = rawW;
+      let targetH = rawH;
 
-    const rawW = video.videoWidth || 640;
-    const rawH = video.videoHeight || 480;
-    const maxDim = 480;
-    let targetW = rawW;
-    let targetH = rawH;
-
-    if (rawW >= rawH) {
-      if (rawW > maxDim) {
-        targetW = maxDim;
-        targetH = Math.round((rawH * maxDim) / rawW);
+      if (rawW >= rawH) {
+        if (rawW > maxDim) {
+          targetW = maxDim;
+          targetH = Math.round((rawH * maxDim) / rawW);
+        }
+      } else {
+        if (rawH > maxDim) {
+          targetH = maxDim;
+          targetW = Math.round((rawW * maxDim) / rawH);
+        }
       }
-    } else {
-      if (rawH > maxDim) {
-        targetH = maxDim;
-        targetW = Math.round((rawW * maxDim) / rawH);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Gagal menginisialisasi canvas untuk kompresi foto.');
       }
+
+      if (facingMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
+      processDataUrl(dataUrl, targetW, targetH);
+    } catch (err: any) {
+      console.error('[ATTENDANCE_IMAGE_ERROR]', err);
+      setCameraError('Gagal memproses foto selfie. Silakan coba ulangi pengambilan foto.');
+    } finally {
+      setIsProcessing(false);
     }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-    processDataUrl(dataUrl, targetW, targetH);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsProcessing(true);
     const reader = new FileReader();
+    reader.onerror = () => {
+      console.error('[ATTENDANCE_IMAGE_ERROR] FileReader error');
+      setCameraError('Gagal membaca foto dari perangkat. Silakan pilih foto lain.');
+      setIsProcessing(false);
+    };
     reader.onload = (event) => {
       const img = new Image();
+      img.onerror = () => {
+        console.error('[ATTENDANCE_IMAGE_ERROR] Image load error');
+        setCameraError('Format file foto tidak didukung.');
+        setIsProcessing(false);
+      };
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 480;
-        let targetW = img.width;
-        let targetH = img.height;
+        try {
+          const canvas = document.createElement('canvas');
+          const maxDim = 640;
+          let targetW = img.width;
+          let targetH = img.height;
 
-        if (img.width >= img.height) {
-          if (img.width > maxDim) {
-            targetW = maxDim;
-            targetH = Math.round((img.height * maxDim) / img.width);
+          if (img.width >= img.height) {
+            if (img.width > maxDim) {
+              targetW = maxDim;
+              targetH = Math.round((img.height * maxDim) / img.width);
+            }
+          } else {
+            if (img.height > maxDim) {
+              targetH = maxDim;
+              targetW = Math.round((img.width * maxDim) / img.height);
+            }
           }
-        } else {
-          if (img.height > maxDim) {
-            targetH = maxDim;
-            targetW = Math.round((img.width * maxDim) / img.height);
-          }
-        }
 
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw new Error('Gagal membuat context 2D canvas.');
+          }
+
           ctx.drawImage(img, 0, 0, targetW, targetH);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
           processDataUrl(dataUrl, targetW, targetH);
+        } catch (err: any) {
+          console.error('[ATTENDANCE_IMAGE_ERROR]', err);
+          setCameraError('Gagal mengompres foto selfie.');
+        } finally {
+          setIsProcessing(false);
         }
       };
       img.src = event.target?.result as string;
@@ -217,11 +249,13 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
   const handleRetake = () => {
     setCapturedImage(null);
     setPhotoMeta(null);
+    setIsProcessing(false);
     startCamera();
   };
 
   const handleConfirm = () => {
-    if (capturedImage) {
+    if (capturedImage && !isProcessing) {
+      setIsProcessing(true);
       onCapture(capturedImage, photoMeta || undefined);
       onClose();
     }
@@ -325,16 +359,26 @@ export const CameraSelfieModal: React.FC<CameraSelfieModalProps> = ({
               <button
                 type="button"
                 onClick={handleRetake}
-                className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors flex items-center justify-center gap-2"
+                disabled={isProcessing}
+                className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" /> Ulangi Foto
               </button>
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"
+                disabled={isProcessing}
+                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="h-4 w-4" /> Gunakan Foto
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" /> Memproses...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" /> Gunakan Foto
+                  </>
+                )}
               </button>
             </div>
           ) : (

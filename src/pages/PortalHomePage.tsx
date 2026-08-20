@@ -29,6 +29,7 @@ import { subscribeDailyPerformance } from '../services/performanceService';
 import { subscribeExpenses } from '../services/expenseService';
 import { subscribeTodayContent } from '../services/contentCalendarService';
 import { ContentProductionDashboardWidget } from '../components/contentCalendar/ContentProductionDashboardWidget';
+import { EmployeePortalDashboard } from '../components/dashboard/EmployeePortalDashboard';
 import { DailyPerformance, Expense, ContentCalendarItem } from '../types';
 import { formatRupiah, tanggalHariIni } from '../utils/formatters';
 
@@ -363,14 +364,17 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
     },
   ];
 
+  // If Employee, render real-data Employee Portal Dashboard
+  if (role === 'EMPLOYEE') {
+    return <EmployeePortalDashboard onNavigate={onNavigate} />;
+  }
+
   // Select card list according to user role
   const activeCards =
     role === 'OWNER'
       ? ownerCards
       : role === 'MANAGER'
       ? managerCards
-      : role === 'EMPLOYEE'
-      ? employeeCards
       : investorCards;
 
   return (

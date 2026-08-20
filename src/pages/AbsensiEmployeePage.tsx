@@ -115,11 +115,7 @@ export const AbsensiEmployeePage: React.FC = () => {
 
   const handleCapturePhoto = async (dataUrl: string) => {
     setLoadingAction(true);
-    setLoadingStatusText(
-      attendanceMode === 'checkin'
-        ? 'Menyimpan absensi masuk...'
-        : 'Menyimpan absensi pulang...'
-    );
+    setLoadingStatusText('Mengompres foto...');
     setNotification(null);
 
     try {
@@ -132,6 +128,9 @@ export const AbsensiEmployeePage: React.FC = () => {
           holidays,
           currentUserId: currentUser?.uid || userProfile?.uid || '',
           currentUserName: activeEmployeeName,
+          onProgress: (stepMsg) => {
+            setLoadingStatusText(stepMsg);
+          },
         });
 
         // Set state notification ONLY after Firestore write is confirmed
@@ -153,6 +152,9 @@ export const AbsensiEmployeePage: React.FC = () => {
           schedule,
           currentUserId: currentUser?.uid || userProfile?.uid || '',
           currentUserName: activeEmployeeName,
+          onProgress: (stepMsg) => {
+            setLoadingStatusText(stepMsg);
+          },
         });
 
         // Set state notification ONLY after Firestore write is confirmed
@@ -167,7 +169,7 @@ export const AbsensiEmployeePage: React.FC = () => {
         });
       }
     } catch (err: any) {
-      console.error('[ATTENDANCE_SAVE_ERROR]', {
+      console.error('[ATTENDANCE_ERROR]', {
         code: err.code || 'UNKNOWN_ERROR',
         message: err.message || String(err),
       });

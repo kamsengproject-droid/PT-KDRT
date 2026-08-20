@@ -77,7 +77,7 @@ interface DatabaseSampelPageProps {
 
 const STATUS_FLOW: SampleStatus[] = ['DIPESAN', 'DIKIRIM', 'DITERIMA', 'DIGUNAKAN', 'SELESAI'];
 
-const KATEGORI_OPTIONS = [
+export const MASTER_KATEGORI_OPTIONS = [
   'Skincare & Kecantikan',
   'Fashion & Pakaian',
   'Mainan & Hobi',
@@ -88,6 +88,13 @@ const KATEGORI_OPTIONS = [
   'Makanan & Minuman',
   'Kesehatan & Kebugaran',
   'Lainnya',
+];
+
+export const EMPLOYEE_KATEGORI_OPTIONS = [
+  'Fashion Kaos',
+  'Fashion Setelan',
+  'Fashion Batik',
+  'Fashion Celana',
 ];
 
 export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
@@ -146,7 +153,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     productImage: '',
     commissionRate: 10,
     accountIds: [],
-    category: 'Skincare & Kecantikan',
+    category: isEmployee ? 'Fashion Kaos' : 'Skincare & Kecantikan',
     scope: isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI'),
     status: 'AKTIF',
     notes: '',
@@ -1304,7 +1311,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                     onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-medium"
                   >
-                    {KATEGORI_OPTIONS.map((cat) => (
+                    {(isEmployee ? EMPLOYEE_KATEGORI_OPTIONS : MASTER_KATEGORI_OPTIONS).map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>

@@ -33,7 +33,7 @@ interface AddProductSampleModalProps {
   onSaved: (result: { product: Product; sample?: AffiliateSample }) => void;
 }
 
-const KATEGORI_OPTIONS = [
+export const MASTER_KATEGORI_OPTIONS = [
   'Skincare & Kecantikan',
   'Fashion & Pakaian',
   'Mainan & Hobi',
@@ -44,6 +44,13 @@ const KATEGORI_OPTIONS = [
   'Makanan & Minuman',
   'Kesehatan & Kebugaran',
   'Lainnya',
+];
+
+export const EMPLOYEE_KATEGORI_OPTIONS = [
+  'Fashion Kaos',
+  'Fashion Setelan',
+  'Fashion Batik',
+  'Fashion Celana',
 ];
 
 export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
@@ -58,11 +65,13 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
   canChooseScope,
   onSaved,
 }) => {
+  const activeCategoryOptions = canChooseScope ? MASTER_KATEGORI_OPTIONS : EMPLOYEE_KATEGORI_OPTIONS;
+
   // FORM FIELDS
   const [productName, setProductName] = useState<string>('');
   const [productImage, setProductImage] = useState<string>('');
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
-  const [category, setCategory] = useState<string>('Skincare & Kecantikan');
+  const [category, setCategory] = useState<string>(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
   const [productPrice, setProductPrice] = useState<number | ''>('');
   const [samplePrice, setSamplePrice] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -94,7 +103,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
       setProductName('');
       setProductImage('');
       setSelectedPhotoFile(null);
-      setCategory('Skincare & Kecantikan');
+      setCategory(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
       setProductPrice('');
       setSamplePrice('');
       setQuantity(1);
@@ -455,7 +464,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none"
               >
-                {KATEGORI_OPTIONS.map((cat) => (
+                {activeCategoryOptions.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
                   </option>
