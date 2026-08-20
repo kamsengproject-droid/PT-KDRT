@@ -132,19 +132,21 @@ export const KaryawanPage: React.FC<KaryawanPageProps> = ({
     return unsub;
   }, [loading, currentUser?.uid, userProfile?.role, userProfile?.active, selectedEmployee]);
 
-  // Handle Investor Permission Block
-  if (role === 'INVESTOR') {
+  // Handle Employee & Investor Permission Block
+  if (role === 'EMPLOYEE' || role === 'INVESTOR') {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 max-w-2xl mx-auto my-12 shadow-sm">
         <Lock className="mx-auto h-12 w-12 text-rose-600 mb-3" />
         <h2 className="font-extrabold text-lg">Akses Data Karyawan Dibatasi</h2>
         <p className="text-xs text-rose-700 mt-2 leading-relaxed">
-          Akun Investor hanya memiliki akses ke Laporan Performa &amp; Bagi Hasil Sharing PT.KDRT. Modul internal data karyawan hanya dapat diakses oleh Owner dan Manajemen Kantor.
+          {role === 'EMPLOYEE'
+            ? 'Karyawan hanya memiliki akses ke Profil Saya dan Slip Gaji pribadi. Daftar seluruh data karyawan hanya dapat diakses oleh Owner dan Manajemen Kantor.'
+            : 'Akun Investor hanya memiliki akses ke Laporan Performa & Bagi Hasil Sharing PT.KDRT. Modul internal data karyawan hanya dapat diakses oleh Owner dan Manajemen Kantor.'}
         </p>
         {onBackToPortal && (
           <button
             onClick={onBackToPortal}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-2xs"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
           >
             <Home className="h-4 w-4" />
             <span>Kembali ke Portal</span>

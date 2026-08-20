@@ -61,7 +61,8 @@ export function subscribeAttendanceBonuses(
 
 export function subscribeAttendanceBonusesByEmployee(
   employeeId: string,
-  callback: (bonuses: AttendanceBonusWeek[]) => void
+  callback: (bonuses: AttendanceBonusWeek[]) => void,
+  onError?: (err: any) => void
 ) {
   const colRef = collection(db, 'attendanceBonuses');
   const q = query(
@@ -80,7 +81,13 @@ export function subscribeAttendanceBonusesByEmployee(
       callback(list);
     },
     (err) => {
+      console.error('[EMPLOYEE_PAYROLL_ERROR]', {
+        type: 'attendanceBonuses',
+        code: err?.code,
+        message: err?.message,
+      });
       handleFirestoreError(err, OperationType.GET, 'attendanceBonuses');
+      if (onError) onError(err);
     }
   );
 }
@@ -279,7 +286,8 @@ export function subscribePayroll(
 
 export function subscribeEmployeePayroll(
   employeeId: string,
-  callback: (payrolls: PayrollRecord[]) => void
+  callback: (payrolls: PayrollRecord[]) => void,
+  onError?: (err: any) => void
 ) {
   const q = query(
     collection(db, 'payroll'),
@@ -313,7 +321,13 @@ export function subscribeEmployeePayroll(
       callback(list);
     },
     (err) => {
+      console.error('[EMPLOYEE_PAYROLL_ERROR]', {
+        type: 'payroll',
+        code: err?.code,
+        message: err?.message,
+      });
       handleFirestoreError(err, OperationType.GET, 'payroll');
+      if (onError) onError(err);
     }
   );
 }

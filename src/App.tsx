@@ -32,6 +32,7 @@ import { LaporanPage } from './pages/LaporanPage';
 import { ExportCenterPage } from './pages/ExportCenterPage';
 import { TutupBulanPage } from './pages/TutupBulanPage';
 import { KerjaanHarianPage } from './pages/KerjaanHarianPage';
+import { ProfilSayaPage } from './pages/ProfilSayaPage';
 import { LoginPage } from './pages/LoginPage';
 import { Lock } from 'lucide-react';
 
@@ -89,7 +90,8 @@ const MainLayout: React.FC = () => {
         'portal',
         'absensi-karyawan',
         'riwayat-absensi',
-        'data-saya',
+        'slip-gaji-karyawan',
+        'profil-saya',
         'kerjaan-harian',
         'database-sampel',
         'produk',
@@ -123,7 +125,12 @@ const MainLayout: React.FC = () => {
         return <RiwayatAbsensiPage />;
       case 'slip-gaji-karyawan':
         return <SlipGajiEmployeePage />;
+      case 'profil-saya':
+        return <ProfilSayaPage onBackToPortal={handleBackToPortal} />;
       case 'data-saya':
+        if (role === 'EMPLOYEE') {
+          return <ProfilSayaPage onBackToPortal={handleBackToPortal} />;
+        }
         return (
           <KaryawanPage
             onBackToPortal={handleBackToPortal}

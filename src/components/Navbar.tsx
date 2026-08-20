@@ -85,9 +85,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* User Info Display: Avatar & Badge */}
         <button
-          onClick={() => setActiveMenu(role === 'EMPLOYEE' ? 'data-saya' : 'profil-saya')}
+          onClick={() => setActiveMenu('profil-saya')}
           className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1 sm:p-1.5 sm:pr-2.5 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-slate-100 transition-colors cursor-pointer text-left shrink-0"
-          title="Buka Profil Saya"
+          title={role === 'EMPLOYEE' ? 'Buka Profil Saya' : 'Profil & Akun'}
         >
           {/* Avatar */}
           {userProfile?.photoUrl ? (
@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {userProfile?.name || 'User'}
             </span>
             <span className="text-[9px] font-semibold text-slate-500 uppercase">
-              {role === 'EMPLOYEE' ? 'Talent' : role}
+              {role === 'EMPLOYEE' ? 'PROFIL SAYA' : role}
             </span>
           </div>
 
@@ -116,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               role
             )}`}
           >
-            {role}
+            {role === 'EMPLOYEE' ? 'PROFIL SAYA' : role}
           </span>
         </button>
 

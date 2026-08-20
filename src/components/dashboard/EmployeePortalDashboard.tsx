@@ -49,6 +49,8 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
   // Employee Identity (Auth UID -> users/{uid} -> employees.userId / employeeProfile.id)
   const activeEmployeeId =
     employeeProfile?.id ||
+    userProfile?.employeeId ||
+    (currentUser?.uid ? currentUser.uid : '') ||
     (userProfile?.name?.toLowerCase().includes('desta') ? 'desta-id' : 'melinda-id');
   const activeEmployeeName = employeeProfile?.name || userProfile?.name || 'Karyawan PT.KDRT';
 
@@ -71,6 +73,9 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
 
   useEffect(() => {
     if (authLoading || !currentUser || !userProfile?.active || !activeEmployeeId) {
+      if (!authLoading) {
+        setLoadingSalary(false);
+      }
       return;
     }
 
@@ -80,12 +85,24 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
     setLoadingSamples(true);
     setHasSalaryError(false);
 
+    // Safety timeout to avoid infinite loading
+    const safetyTimer = setTimeout(() => {
+      setLoadingSalary(false);
+    }, 4000);
+
     // 1. Subscribe Payroll Real Data (Isolated for current employee)
     const unsubPayroll = subscribeEmployeePayroll(
       activeEmployeeId,
       (list) => {
+        clearTimeout(safetyTimer);
         setPayrolls(list);
         setLoadingSalary(false);
+        setHasSalaryError(false);
+      },
+      (_err) => {
+        clearTimeout(safetyTimer);
+        setLoadingSalary(false);
+        setHasSalaryError(true);
       }
     );
 
@@ -94,6 +111,9 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
       activeEmployeeId,
       (list) => {
         setWeeklyBonuses(list);
+      },
+      (_err) => {
+        setWeeklyBonuses([]);
       }
     );
 
@@ -133,6 +153,7 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
     );
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubPayroll();
       unsubBonuses();
       unsubAttendance();
@@ -283,7 +304,7 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
             </h2>
           </div>
           <button
-            onClick={() => onNavigate('data-saya')}
+            onClick={() => onNavigate('slip-gaji-karyawan')}
             className="text-[11px] font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 transition-colors"
           >
             <span>Rincian Slip Gaji</span>
@@ -306,8 +327,9 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
             ))}
           </div>
         ) : hasSalaryError ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center text-rose-700 text-xs font-bold">
-            Data gagal dimuat.
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center text-rose-700 text-xs font-bold">
+            <span className="font-black text-rose-900 block mb-1">DATA GAJI GAGAL DIMUAT</span>
+            Silakan periksa koneksi jaringan atau coba muat ulang halaman.
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

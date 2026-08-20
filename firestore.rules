@@ -95,8 +95,11 @@ service cloud.firestore {
     // 4. ATTENDANCE BONUSES (UANG RAJIN)
     // ==========================================
     match /attendanceBonuses/{bonusId} {
-      allow read: if isOwner() || isManager() || !isAuthenticated() ||
-        (isAuthenticated() && resource.data.get('employeeId', '') == request.auth.uid);
+      allow read: if isOwner() || isManager() || isEmployee() || !isAuthenticated() ||
+        (isAuthenticated() && (
+          resource.data.get('employeeId', '') == request.auth.uid || 
+          resource.data.get('userId', '') == request.auth.uid
+        ));
       allow write: if isOwner() || isManager();
     }
 
@@ -105,8 +108,11 @@ service cloud.firestore {
     // (Investor STRICTLY FORBIDDEN from reading individual employee payroll)
     // ==========================================
     match /payroll/{payrollDocId} {
-      allow read: if isOwner() || isManager() || !isAuthenticated() ||
-        (isAuthenticated() && (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+      allow read: if isOwner() || isManager() || isEmployee() || !isAuthenticated() ||
+        (isAuthenticated() && (
+          resource.data.get('employeeId', '') == request.auth.uid || 
+          resource.data.get('userId', '') == request.auth.uid
+        ));
       allow write: if isOwner();
     }
 

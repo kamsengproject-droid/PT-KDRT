@@ -21,6 +21,59 @@ async function startServer() {
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
+  // Helper to normalize and canonicalize IP addresses (IPv4 & IPv6)
+  function normalizeIp(ipStr: string): string {
+    let clean = ipStr.trim().toLowerCase();
+    
+    // Remove port if present (e.g., 158.140.166.38:12345 or [2402:...]:12345)
+    if (clean.startsWith('[') && clean.includes(']')) {
+      clean = clean.slice(1, clean.indexOf(']'));
+    } else if (clean.includes(':') && clean.includes('.') && clean.startsWith('::ffff:')) {
+      clean = clean.slice(7);
+    } else if (!clean.includes(':') && clean.includes(':')) {
+      // no-op
+    }
+
+    // Strip IPv6-mapped IPv4 e.g. ::ffff:158.140.166.38
+    if (clean.startsWith('::ffff:')) {
+      clean = clean.slice(7);
+    }
+
+    return clean;
+  }
+
+  // Canonicalize IPv6 representation for robust comparison
+  function expandIPv6(ip: string): string {
+    const clean = normalizeIp(ip);
+    if (!clean.includes(':')) return clean; // Not IPv6, return as is (IPv4)
+
+    const parts = clean.split('::');
+    let left = parts[0] ? parts[0].split(':') : [];
+    let right = parts[1] ? parts[1].split(':') : [];
+
+    if (parts.length > 1) {
+      const missing = 8 - (left.length + right.length);
+      const zeros = Array(Math.max(0, missing)).fill('0');
+      left = left.concat(zeros).concat(right);
+    }
+
+    return left.map((p) => p.padStart(4, '0')).join(':');
+  }
+
+  function ipMatches(clientIp: string, whitelistIp: string): boolean {
+    const normClient = normalizeIp(clientIp);
+    const normWhitelist = normalizeIp(whitelistIp);
+
+    if (normClient === normWhitelist) return true;
+
+    // If both are IPv6, compare expanded canonical forms
+    if (normClient.includes(':') && normWhitelist.includes(':')) {
+      return expandIPv6(normClient) === expandIPv6(normWhitelist);
+    }
+
+    return false;
+  }
+
   // Helper to extract client public IP from proxy headers or socket
   function extractClientIp(req: express.Request): string {
     const forwardedFor = req.headers['x-forwarded-for'];
@@ -47,16 +100,13 @@ async function startServer() {
       rawIp = req.socket.remoteAddress.trim();
     }
 
-    // Normalize IPv6-mapped IPv4 e.g. ::ffff:158.140.166.38 -> 158.140.166.38
-    if (rawIp.startsWith('::ffff:')) {
-      rawIp = rawIp.slice(7);
-    }
-
-    return rawIp;
+    return normalizeIp(rawIp);
   }
 
   function getAllowedOfficeIps(): string[] {
-    const envIps = process.env.OFFICE_PUBLIC_IPS || '158.140.166.38';
+    const envIps =
+      process.env.OFFICE_PUBLIC_IPS ||
+      '158.140.166.38,2402:8780:1201:81ed:5d0b:b213:dbef:34f1';
     return envIps
       .split(',')
       .map((ip) => ip.trim())
@@ -69,7 +119,7 @@ async function startServer() {
   });
 
   // =========================================================================
-  // API: NETWORK VERIFICATION FOR ROLE ACCESS CONTROL
+  // API: NETWORK VERIFICATION FOR ROLE ACCESS CONTROL (IPv4 + IPv6)
   // =========================================================================
   app.post('/api/auth/verify-network', (req, res) => {
     try {
@@ -78,26 +128,30 @@ async function startServer() {
       const requestPublicIp = extractClientIp(req);
       const allowedOfficeIps = getAllowedOfficeIps();
 
+      const matchedWhitelist = allowedOfficeIps.some((officeIp) =>
+        ipMatches(requestPublicIp, officeIp)
+      );
+
       let allowed = false;
 
       // 1. OWNER and INVESTOR can login from anywhere
       if (normalizedRole === 'OWNER' || normalizedRole === 'INVESTOR') {
         allowed = true;
       }
-      // 2. EMPLOYEE & MANAGER must originate from office public IP
+      // 2. EMPLOYEE & MANAGER must originate from office public IP (IPv4 or IPv6)
       else if (normalizedRole === 'EMPLOYEE' || normalizedRole === 'MANAGER') {
-        allowed = allowedOfficeIps.includes(requestPublicIp);
+        allowed = matchedWhitelist;
       }
       // 3. Fallback for undefined/unknown roles: require office network
       else {
-        allowed = allowedOfficeIps.includes(requestPublicIp);
+        allowed = matchedWhitelist;
       }
 
       // Temporary server-side diagnostic logging (Requirement 15)
       console.log('[LOGIN_NETWORK_CHECK]', {
         role: normalizedRole,
-        uid: uid || 'anonymous',
         requestPublicIp: requestPublicIp || 'unknown',
+        matchedWhitelist: matchedWhitelist,
         allowed: allowed,
       });
 
