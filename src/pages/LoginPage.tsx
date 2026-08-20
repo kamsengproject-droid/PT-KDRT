@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { PtKdrtLogo } from '../components/PtKdrtLogo';
 
 export const LoginPage: React.FC = () => {
   const { loginWithEmail } = useAuth();
@@ -61,15 +62,11 @@ export const LoginPage: React.FC = () => {
         
         {/* Brand Header */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <img 
-            src="/Logo_design_for_affiliate_company_202608190808.jpeg" 
-            alt="PT KDRT Logo" 
-            className="w-[150px] sm:w-[220px] h-auto object-contain mb-4 rounded-xl shadow-xl"
-          />
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <PtKdrtLogo variant="full" size="lg" className="mb-4" />
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-2">
             KANTOR PT.KDRT
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 mt-2 font-medium">
+          <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium">
             Selamat datang di sistem aplikasi KANTOR PT.KDRT
           </p>
           <p className="text-[11px] sm:text-xs text-slate-400 mt-1 font-medium max-w-xs mx-auto leading-relaxed">

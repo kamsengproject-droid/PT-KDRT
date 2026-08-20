@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { PtKdrtLogo } from './PtKdrtLogo';
 
 interface SidebarProps {
   activeMenu: string;
@@ -258,14 +259,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               setActiveMenu('portal');
               onClose();
             }}
-            className="flex items-center space-x-2.5 text-left group"
+            className="flex items-center space-x-2 text-left group"
           >
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center font-black text-white text-sm shadow-xs group-hover:bg-orange-600 transition-colors">
-              KD
-            </div>
-            <span className="font-extrabold text-sm text-white tracking-wide group-hover:text-orange-400 transition-colors">
-              KANTOR PT.KDRT
-            </span>
+            <PtKdrtLogo variant="horizontal" size="sm" showSubtitle={false} className="[&_span]:text-white group-hover:[&_span]:text-cyan-300" />
           </button>
           <button
             onClick={onClose}

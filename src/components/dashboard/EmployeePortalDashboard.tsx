@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PtKdrtLogo } from '../PtKdrtLogo';
 import {
   subscribeEmployeePayroll,
   subscribeAttendanceBonusesByEmployee,
@@ -260,14 +261,9 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500 text-white font-black text-sm shadow-xs">
-                KD
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                KANTOR PT.KDRT
-              </h1>
+              <PtKdrtLogo variant="horizontal" size="md" />
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1.5 font-medium">
               Pilih aplikasi yang ingin Anda akses.
             </p>
           </div>

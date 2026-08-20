@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
+import { PtKdrtLogo } from './PtKdrtLogo';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -66,12 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveMenu('portal')}
           className="flex items-center gap-1.5 sm:gap-2 text-left group shrink-0"
         >
-          <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-orange-500 text-white font-black text-xs shadow-2xs group-hover:bg-orange-600 transition-colors shrink-0">
-            KD
-          </span>
-          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight group-hover:text-orange-600 transition-colors whitespace-nowrap">
-            KANTOR PT.KDRT
-          </span>
+          <PtKdrtLogo variant="horizontal" size="sm" showSubtitle={false} />
         </button>
       </div>
 
