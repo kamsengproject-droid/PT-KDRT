@@ -8,7 +8,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { PtKdrtLogo } from '../components/PtKdrtLogo';
 
 export const LoginPage: React.FC = () => {
   const { loginWithEmail } = useAuth();
@@ -42,7 +41,9 @@ export const LoginPage: React.FC = () => {
         err?.message?.includes('jaringan kantor')
       ) {
         setIsNetworkDenied(true);
-        setErrorMessage('Login karyawan hanya dapat dilakukan melalui jaringan kantor.');
+        setErrorMessage(
+          err?.message || 'Login karyawan hanya dapat dilakukan melalui jaringan kantor PT.KDRT.'
+        );
       } else {
         setIsNetworkDenied(false);
         setErrorMessage('Email atau kata sandi tidak sesuai.');
@@ -54,23 +55,29 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-slate-950 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden font-sans text-slate-100">
-      {/* Background Subtle Gradient Spheres */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Background Subtle Ambient Glow */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
       
       <div className="w-full max-w-md relative z-10">
         
-        {/* Brand Header */}
-        <div className="text-center mb-8 flex flex-col items-center">
-          <PtKdrtLogo variant="full" size="lg" className="mb-4" />
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-2">
-            KANTOR PT.KDRT
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium">
-            Selamat datang di sistem aplikasi KANTOR PT.KDRT
-          </p>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-1 font-medium max-w-xs mx-auto leading-relaxed">
-            Kelola operasional, keuangan, dan aktivitas kantor dalam satu sistem.
+        {/* Brand Header with Exact Unified Logo */}
+        <div className="text-center mb-6 flex flex-col items-center">
+          <div className="w-40 h-40 sm:w-48 sm:h-48 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/20 mb-3 bg-slate-950 flex items-center justify-center p-1.5 transition-all">
+            <img
+              src="/assets/logo-kdrt.webp"
+              alt="PT.KDRT - Selamat Datang di Sistem Kamsengproject"
+              className="w-full h-full object-contain rounded-xl"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                // Fallback to PNG if WebP is not supported
+                (e.currentTarget as HTMLImageElement).src = '/assets/logo-kdrt.png';
+              }}
+            />
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium max-w-xs text-center leading-relaxed">
+            Kelola aktivitas dan operasional Kamsengproject dalam satu sistem.
           </p>
         </div>
 
@@ -78,7 +85,7 @@ export const LoginPage: React.FC = () => {
         <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8">
           
           <div className="text-center mb-6 border-b border-slate-800 pb-4">
-            <h2 className="text-lg font-bold text-white tracking-wide uppercase">Masuk Akun</h2>
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-wide uppercase">Masuk Akun</h2>
           </div>
 
           {/* Error Message */}
@@ -173,10 +180,11 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Footer info */}
-        <div className="text-center mt-6 text-[11px] text-slate-500 font-medium">
+        <div className="text-center mt-6 text-[11px] text-slate-500 font-medium leading-relaxed">
           PT. KDRT MANAGEMENT<br />Designed by Ko Kamseng
         </div>
       </div>
     </div>
   );
 };
+

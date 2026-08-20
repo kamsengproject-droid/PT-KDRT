@@ -30,8 +30,6 @@ async function startServer() {
       clean = clean.slice(1, clean.indexOf(']'));
     } else if (clean.includes(':') && clean.includes('.') && clean.startsWith('::ffff:')) {
       clean = clean.slice(7);
-    } else if (!clean.includes(':') && clean.includes(':')) {
-      // no-op
     }
 
     // Strip IPv6-mapped IPv4 e.g. ::ffff:158.140.166.38
@@ -42,33 +40,80 @@ async function startServer() {
     return clean;
   }
 
-  // Canonicalize IPv6 representation for robust comparison
-  function expandIPv6(ip: string): string {
-    const clean = normalizeIp(ip);
-    if (!clean.includes(':')) return clean; // Not IPv6, return as is (IPv4)
+  // Canonicalize IPv6 representation for robust comparison into 8 16-bit hex blocks
+  function expandIPv6(ip: string): string[] {
+    const clean = normalizeIp(ip).split('/')[0];
+    if (!clean.includes(':')) return [];
 
     const parts = clean.split('::');
-    let left = parts[0] ? parts[0].split(':') : [];
-    let right = parts[1] ? parts[1].split(':') : [];
+    let left = parts[0] ? parts[0].split(':').filter(Boolean) : [];
+    let right = parts[1] ? parts[1].split(':').filter(Boolean) : [];
 
-    if (parts.length > 1) {
-      const missing = 8 - (left.length + right.length);
-      const zeros = Array(Math.max(0, missing)).fill('0');
-      left = left.concat(zeros).concat(right);
-    }
+    const missing = 8 - (left.length + right.length);
+    const zeros = Array(Math.max(0, missing)).fill('0');
+    const full = left.concat(zeros).concat(right);
 
-    return left.map((p) => p.padStart(4, '0')).join(':');
+    return full.map((p) => p.padStart(4, '0'));
   }
 
-  function ipMatches(clientIp: string, whitelistIp: string): boolean {
+  function ipMatches(clientIp: string, whitelistEntry: string): boolean {
     const normClient = normalizeIp(clientIp);
-    const normWhitelist = normalizeIp(whitelistIp);
+    const normWhitelist = normalizeIp(whitelistEntry);
 
+    if (!normClient || !normWhitelist) return false;
+
+    // Exact string match (IPv4 or IPv6)
     if (normClient === normWhitelist) return true;
 
-    // If both are IPv6, compare expanded canonical forms
+    // IPv4 CIDR matching (e.g. 158.140.166.0/24)
+    if (!normClient.includes(':') && normWhitelist.includes('/')) {
+      const [baseIp, cidrStr] = normWhitelist.split('/');
+      const cidr = parseInt(cidrStr, 10);
+      if (!isNaN(cidr) && cidr >= 0 && cidr <= 32) {
+        const clientParts = normClient.split('.').map(Number);
+        const baseParts = baseIp.split('.').map(Number);
+        if (clientParts.length === 4 && baseParts.length === 4) {
+          const clientNum =
+            ((clientParts[0] << 24) |
+              (clientParts[1] << 16) |
+              (clientParts[2] << 8) |
+              clientParts[3]) >>>
+            0;
+          const baseNum =
+            ((baseParts[0] << 24) |
+              (baseParts[1] << 16) |
+              (baseParts[2] << 8) |
+              baseParts[3]) >>>
+            0;
+          const mask = cidr === 0 ? 0 : (~0 << (32 - cidr)) >>> 0;
+          if ((clientNum & mask) === (baseNum & mask)) return true;
+        }
+      }
+    }
+
+    // IPv6 Matching: /64 subnet prefix matching (all devices on office WiFi share the first 64 bits)
     if (normClient.includes(':') && normWhitelist.includes(':')) {
-      return expandIPv6(normClient) === expandIPv6(normWhitelist);
+      const clientBlocks = expandIPv6(normClient);
+      const whitelistBlocks = expandIPv6(normWhitelist);
+
+      if (clientBlocks.length === 8 && whitelistBlocks.length === 8) {
+        let prefixBits = 64; // Default IPv6 standard office subnet is /64
+        if (normWhitelist.includes('/')) {
+          const cidr = parseInt(normWhitelist.split('/')[1], 10);
+          if (!isNaN(cidr)) prefixBits = cidr;
+        }
+
+        // Compare blocks
+        const fullBlocks = Math.min(8, Math.max(1, Math.floor(prefixBits / 16)));
+        let match = true;
+        for (let i = 0; i < fullBlocks; i++) {
+          if (clientBlocks[i] !== whitelistBlocks[i]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) return true;
+      }
     }
 
     return false;
@@ -104,18 +149,32 @@ async function startServer() {
   }
 
   function getAllowedOfficeIps(): string[] {
-    const envIps =
-      process.env.OFFICE_PUBLIC_IPS ||
-      '158.140.166.38,2402:8780:1201:81ed:5d0b:b213:dbef:34f1';
-    return envIps
-      .split(',')
-      .map((ip) => ip.trim())
-      .filter((ip) => ip.length > 0);
+    const defaultOfficeIps = [
+      '158.140.166.38',
+      '158.140.166.0/24',
+      '2402:8780:1201:81ed::/64',
+      '2402:8780:1201:81ed:5d0b:b213:dbef:34f1',
+    ];
+    const envIps = process.env.OFFICE_PUBLIC_IPS
+      ? process.env.OFFICE_PUBLIC_IPS.split(',')
+          .map((ip) => ip.trim())
+          .filter(Boolean)
+      : [];
+
+    return Array.from(new Set([...defaultOfficeIps, ...envIps]));
   }
 
   // API Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // API: Get Current Detected Client IP
+  app.get('/api/auth/client-ip', (req, res) => {
+    const clientIp = extractClientIp(req);
+    const allowedIps = getAllowedOfficeIps();
+    const isAllowed = allowedIps.some((officeIp) => ipMatches(clientIp, officeIp));
+    res.json({ clientIp, isAllowed, allowedOfficeIps: allowedIps });
   });
 
   // =========================================================================
@@ -147,7 +206,7 @@ async function startServer() {
         allowed = matchedWhitelist;
       }
 
-      // Temporary server-side diagnostic logging (Requirement 15)
+      // Diagnostic logging
       console.log('[LOGIN_NETWORK_CHECK]', {
         role: normalizedRole,
         requestPublicIp: requestPublicIp || 'unknown',
@@ -158,13 +217,15 @@ async function startServer() {
       if (!allowed) {
         return res.status(403).json({
           allowed: false,
+          clientIp: requestPublicIp,
           code: 'OFFICE_NETWORK_REQUIRED',
-          message: 'Login karyawan hanya dapat dilakukan melalui jaringan kantor.',
+          message: `Login karyawan hanya dapat dilakukan melalui jaringan kantor PT.KDRT. (IP terdeteksi: ${requestPublicIp || 'Tidak terdeteksi'})`,
         });
       }
 
       return res.json({
         allowed: true,
+        clientIp: requestPublicIp,
         message: 'Network access granted.',
       });
     } catch (err: any) {

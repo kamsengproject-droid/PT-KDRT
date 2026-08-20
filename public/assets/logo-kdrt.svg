@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <defs>
+    <!-- Background Radial Gradient matching uploaded image -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#0f294d" />
+      <stop offset="45%" stop-color="#08172c" />
+      <stop offset="85%" stop-color="#040b17" />
+      <stop offset="100%" stop-color="#02060e" />
+    </radialGradient>
+
+    <!-- Mesh / Dot Pattern for textured dark canvas -->
+    <pattern id="meshGrid" width="6" height="6" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="0.85" fill="#00e5ff" opacity="0.04" />
+      <circle cx="3" cy="3" r="0.45" fill="#ffffff" opacity="0.03" />
+    </pattern>
+
+    <!-- Cyan Neon Intense Glow Filter -->
+    <filter id="cyanGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1" />
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur2" />
+      <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="blur3" />
+      <feMerge>
+        <feMergeNode in="blur3" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Deep 3D Drop Shadow for Brain and Typography -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.85" />
+    </filter>
+
+    <!-- Metallic Gradient for PT KDRT typography -->
+    <linearGradient id="metallicText" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#F8FAFC" />
+      <stop offset="70%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+
+    <!-- Metallic Chrome Gradient for Arrow -->
+    <linearGradient id="chromeArrow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#94A3B8" />
+      <stop offset="35%" stop-color="#E2E8F0" />
+      <stop offset="70%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+
+    <!-- Glowing Cyan Gradient for Neural Paths -->
+    <linearGradient id="neonPath" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="50%" stop-color="#00c8ff" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1000" height="1000" fill="url(#bgGlow)" />
+  <!-- Background Mesh Texture Overlay -->
+  <rect width="1000" height="1000" fill="url(#meshGrid)" />
+
+  <!-- Center Composition Container (Brain on Left + Typography on Right) -->
+  <g transform="translate(75, 360)">
+    
+    <!-- ========================================== -->
+    <!-- BRAIN & ARROW EMBLEM                       -->
+    <!-- ========================================== -->
+    <g transform="translate(0, 0)">
+      
+      <!-- Outer/Inner Neural Ribbons (Glowing Cyan Mesh) -->
+      <g filter="url(#cyanGlow)" fill="none" stroke="url(#neonPath)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Outer Cranium Lobes -->
+        <path d="M 110 30 C 70 15, 25 50, 30 100 C 12 120, 6 160, 30 195 C 12 225, 30 270, 75 275 C 90 295, 120 305, 150 288 C 170 305, 205 305, 225 288" />
+        <path d="M 110 30 C 150 5, 210 18, 245 55 C 275 30, 325 50, 338 100 C 362 125, 362 180, 338 210" />
+        
+        <!-- Complex Folded Neural Circuits -->
+        <path d="M 60 105 C 95 85, 150 110, 130 160 C 120 190, 75 198, 70 238" />
+        <path d="M 100 65 C 138 65, 175 100, 162 145 C 150 180, 190 220, 228 200" />
+        <path d="M 200 58 C 238 78, 262 128, 238 170 C 220 200, 262 238, 305 212" />
+        <path d="M 150 288 C 175 262, 212 268, 238 242 C 262 218, 300 230, 325 205" />
+        <path d="M 75 275 C 95 240, 125 245, 140 215" />
+        <path d="M 245 55 C 270 90, 295 125, 260 165" />
+      </g>
+
+      <!-- Center Metallic Chrome Loop with Ascending Growth Arrow -->
+      <g filter="url(#dropShadow)">
+        <!-- Underlying Cyan Neon Rim -->
+        <path d="M 85 215 C 60 178, 100 128, 150 140 C 200 152, 175 215, 130 235 C 100 248, 80 222, 92 198 C 118 148, 212 90, 280 48" 
+              fill="none" stroke="#00f0ff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" filter="url(#cyanGlow)" />
+        
+        <!-- Main Metallic Silver/Chrome Arrow Body -->
+        <path d="M 85 215 C 60 178, 100 128, 150 140 C 200 152, 175 215, 130 235 C 100 248, 80 222, 92 198 C 118 148, 212 90, 280 48" 
+              fill="none" stroke="url(#chromeArrow)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+        
+        <!-- Inner Core Highlight -->
+        <path d="M 88 212 C 65 180, 102 132, 150 144 C 196 155, 172 212, 130 232 C 103 244, 84 220, 94 198 C 120 150, 214 92, 280 50" 
+              fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+
+        <!-- Bold 3D Arrowhead -->
+        <path d="M 248 38 L 312 28 L 305 92 Z" 
+              fill="#00e5ff" stroke="#00f0ff" stroke-width="8" stroke-linejoin="round" filter="url(#cyanGlow)" />
+        <path d="M 248 38 L 312 28 L 305 92 Z" 
+              fill="url(#chromeArrow)" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" />
+        <path d="M 260 44 L 306 36 L 300 82 Z" 
+              fill="#FFFFFF" opacity="0.85" />
+      </g>
+    </g>
+
+    <!-- ========================================== -->
+    <!-- TYPOGRAPHY: PT.KDRT & CUSTOM SUB-TEXT      -->
+    <!-- ========================================== -->
+    <g transform="translate(375, 0)">
+      <!-- Main "PT KDRT" Heading -->
+      <text x="0" y="160" 
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" 
+            font-size="128" 
+            font-weight="900" 
+            letter-spacing="3" 
+            fill="url(#metallicText)" 
+            filter="url(#dropShadow)">
+        PT.KDRT
+      </text>
+
+      <!-- Tagline: "Selamat Datang di Sistem Kamsengproject" -->
+      <text x="3" y="222" 
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" 
+            font-size="22.5" 
+            font-weight="700" 
+            letter-spacing="2" 
+            fill="#E2E8F0" 
+            opacity="0.95"
+            filter="url(#dropShadow)">
+        Selamat Datang di Sistem Kamsengproject
+      </text>
+    </g>
+
+  </g>
+</svg>

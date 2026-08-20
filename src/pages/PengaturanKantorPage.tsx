@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   Edit2,
   Home,
+  Wifi,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -91,6 +93,41 @@ export const PengaturanKantorPage: React.FC<{ onBackToPortal?: () => void }> = (
   const [savingHoliday, setSavingHoliday] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Office Network verification state
+  const [networkInfo, setNetworkInfo] = useState<{
+    clientIp: string;
+    isAllowed: boolean;
+    allowedOfficeIps: string[];
+    loading: boolean;
+  }>({
+    clientIp: '',
+    isAllowed: false,
+    allowedOfficeIps: [],
+    loading: false,
+  });
+
+  const checkNetworkStatus = async () => {
+    setNetworkInfo((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch('/api/auth/client-ip');
+      if (res.ok) {
+        const data = await res.json();
+        setNetworkInfo({
+          clientIp: data.clientIp || 'Tidak terdeteksi',
+          isAllowed: Boolean(data.isAllowed),
+          allowedOfficeIps: data.allowedOfficeIps || [],
+          loading: false,
+        });
+      }
+    } catch {
+      setNetworkInfo((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    checkNetworkStatus();
+  }, []);
 
   useEffect(() => {
     if (authLoading || !currentUser || !userProfile?.active) {
@@ -747,6 +784,86 @@ export const PengaturanKantorPage: React.FC<{ onBackToPortal?: () => void }> = (
           </div>
         )}
       </form>
+
+      {/* ========================================================================= */}
+      {/* JARINGAN & IP KANTOR (WIFI ACCESS CONTROL)                                */}
+      {/* ========================================================================= */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Wifi className="h-5 w-5 text-emerald-600" />
+              <span>JARINGAN &amp; IP WIFI KANTOR (ACCESS CONTROL)</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Akun karyawan (EMPLOYEE &amp; MANAGER) hanya dapat login saat terhubung ke jaringan WiFi kantor PT.KDRT.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={checkNetworkStatus}
+            disabled={networkInfo.loading}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors shrink-0 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${networkInfo.loading ? 'animate-spin' : ''}`} />
+            <span>{networkInfo.loading ? 'Memeriksa...' : 'Cek Status Jaringan'}</span>
+          </button>
+        </div>
+
+        {/* Current Detected IP Status Card */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <span className="font-bold text-slate-700 block">IP Publik Perangkat Anda Saat Ini:</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-black text-sm text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 break-all">
+                {networkInfo.clientIp || 'Mendeteksi...'}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] shrink-0 ${
+                  networkInfo.isAllowed
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+              >
+                {networkInfo.isAllowed ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" />
+                    <span>Jaringan Kantor (Diizinkan)</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-3 w-3" />
+                    <span>Luar Kantor / Remote</span>
+                  </>
+                )}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {networkInfo.isAllowed
+                ? 'Perangkat Anda terhubung ke jaringan kantor yang terdaftar. Login karyawan diizinkan.'
+                : 'Perangkat Anda saat ini berada di luar subnet whitelist jaringan kantor.'}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <span className="font-bold text-slate-700 block">Daftar Subnet IP Kantor Terdaftar:</span>
+            <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-md border border-slate-200">
+                <span className="font-bold text-slate-800">158.140.166.38 / 158.140.166.0/24</span>
+                <span className="text-[10px] text-slate-500 font-sans font-semibold">IPv4 Kantor</span>
+              </div>
+              <div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-md border border-slate-200">
+                <span className="font-bold text-slate-800">2402:8780:1201:81ed::/64</span>
+                <span className="text-[10px] text-emerald-600 font-sans font-semibold">Subnet WiFi Kantor (All Device)</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              Subnet IPv6 <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-bold">/64</code> memastikan seluruh HP &amp; laptop karyawan (termasuk Melinda) yang terhubung ke WiFi kantor otomatis dikenali.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* 2. DAFTAR HARI LIBUR NASIONAL & KANTOR                                    */}
       {/* ========================================================================= */}
