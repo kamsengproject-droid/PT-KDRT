@@ -80,6 +80,47 @@ const DEFAULT_INVESTOR_PERMISSIONS: UserPermissions = {
   canManagePayroll: false,
 };
 
+// Helper: Verify client public IP against office whitelist on the server
+async function verifyNetworkAccess(
+  uid: string,
+  role: UserRole
+): Promise<{ allowed: boolean; message?: string }> {
+  // OWNER and INVESTOR can login from anywhere
+  if (role === 'OWNER' || role === 'INVESTOR') {
+    return { allowed: true };
+  }
+
+  try {
+    const res = await fetch('/api/auth/verify-network', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uid, role }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return {
+        allowed: false,
+        message: data.message || 'Login karyawan hanya dapat dilakukan melalui jaringan kantor.',
+      };
+    }
+
+    const data = await res.json();
+    return {
+      allowed: Boolean(data.allowed),
+      message: data.message,
+    };
+  } catch (err) {
+    console.warn('Network verification check failed to reach server:', err);
+    return {
+      allowed: false,
+      message: 'Login karyawan hanya dapat dilakukan melalui jaringan kantor.',
+    };
+  }
+}
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -145,12 +186,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!isMounted) return;
       if (user) {
-        setCurrentUser(user);
-        await loadProfile(user.uid, user.email || undefined);
+        // Check role and enforce network check on initial load/session restore
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const snap = await getDoc(userRef);
+          const currentRole: UserRole = snap.exists() ? (snap.data()?.role as UserRole) : 'EMPLOYEE';
+
+          if (currentRole === 'EMPLOYEE' || currentRole === 'MANAGER') {
+            const netCheck = await verifyNetworkAccess(user.uid, currentRole);
+            if (!netCheck.allowed) {
+              await signOut(auth);
+              if (isMounted) {
+                setCurrentUser(null);
+                setUserProfile(null);
+                setEmployeeProfile(null);
+                setLoading(false);
+              }
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Session network verification error:', err);
+        }
+
+        if (isMounted) {
+          setCurrentUser(user);
+          await loadProfile(user.uid, user.email || undefined);
+        }
       } else {
-        setCurrentUser(null);
-        setUserProfile(null);
-        setEmployeeProfile(null);
+        if (isMounted) {
+          setCurrentUser(null);
+          setUserProfile(null);
+          setEmployeeProfile(null);
+        }
       }
       if (isMounted) setLoading(false);
     });
@@ -165,7 +233,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
-      await loadProfile(res.user.uid, email);
+      const uid = res.user.uid;
+
+      // Fetch user profile from Firestore to determine role
+      const userRef = doc(db, 'users', uid);
+      const snap = await getDoc(userRef);
+      const profileData = snap.exists() ? (snap.data() as UserProfile) : null;
+      const userRole: UserRole = profileData?.role || 'EMPLOYEE';
+
+      // Perform server-side network evaluation
+      if (userRole === 'EMPLOYEE' || userRole === 'MANAGER') {
+        const netCheck = await verifyNetworkAccess(uid, userRole);
+        if (!netCheck.allowed) {
+          // Immediately sign out from Firebase Auth so no session remains
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          setEmployeeProfile(null);
+
+          const netError: any = new Error(
+            netCheck.message || 'Login karyawan hanya dapat dilakukan melalui jaringan kantor.'
+          );
+          netError.code = 'OFFICE_NETWORK_DENIED';
+          netError.isNetworkDenied = true;
+          throw netError;
+        }
+      }
+
+      await loadProfile(uid, email);
     } finally {
       setLoading(false);
     }

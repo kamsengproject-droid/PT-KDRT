@@ -17,10 +17,12 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isNetworkDenied, setIsNetworkDenied] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setIsNetworkDenied(false);
 
     const cleanEmail = email.trim();
     if (!cleanEmail || !password) {
@@ -33,7 +35,17 @@ export const LoginPage: React.FC = () => {
       await loginWithEmail(cleanEmail, password);
     } catch (err: any) {
       console.error('Auth error (internal):', err);
-      setErrorMessage('Email atau kata sandi tidak sesuai.');
+      if (
+        err?.isNetworkDenied ||
+        err?.code === 'OFFICE_NETWORK_DENIED' ||
+        err?.message?.includes('jaringan kantor')
+      ) {
+        setIsNetworkDenied(true);
+        setErrorMessage('Login karyawan hanya dapat dilakukan melalui jaringan kantor.');
+      } else {
+        setIsNetworkDenied(false);
+        setErrorMessage('Email atau kata sandi tidak sesuai.');
+      }
     } finally {
       setLoading(false);
     }
@@ -74,9 +86,26 @@ export const LoginPage: React.FC = () => {
 
           {/* Error Message */}
           {errorMessage && (
-            <div className="mb-5 flex items-start gap-2.5 p-3 rounded-xl bg-rose-950/60 border border-rose-800/50 text-rose-300 text-xs">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
-              <div className="font-medium leading-relaxed">{errorMessage}</div>
+            <div
+              className={`mb-5 flex items-start gap-2.5 p-3.5 rounded-xl border text-xs ${
+                isNetworkDenied
+                  ? 'bg-rose-950/80 border-rose-700/80 text-rose-200'
+                  : 'bg-rose-950/60 border-rose-800/50 text-rose-300'
+              }`}
+            >
+              <AlertCircle
+                className={`h-4 w-4 shrink-0 mt-0.5 ${
+                  isNetworkDenied ? 'text-rose-400' : 'text-rose-400'
+                }`}
+              />
+              <div className="space-y-0.5">
+                {isNetworkDenied && (
+                  <div className="font-extrabold text-white text-[11px] uppercase tracking-wider">
+                    AKSES JARINGAN DITOLAK
+                  </div>
+                )}
+                <div className="font-medium leading-relaxed">{errorMessage}</div>
+              </div>
             </div>
           )}
 

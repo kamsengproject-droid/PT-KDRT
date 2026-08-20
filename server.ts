@@ -14,13 +14,113 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Trust proxy for accurate public client IP behind reverse proxy / Cloud Run / Vercel
+  app.set('trust proxy', true);
+
   // JSON Body Parser for base64 images
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
+  // Helper to extract client public IP from proxy headers or socket
+  function extractClientIp(req: express.Request): string {
+    const forwardedFor = req.headers['x-forwarded-for'];
+    let rawIp = '';
+
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+      // Left-most IP is the original client IP
+      rawIp = forwardedFor.split(',')[0].trim();
+    } else if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+      rawIp = String(forwardedFor[0]).split(',')[0].trim();
+    } else if (typeof req.headers['x-real-ip'] === 'string' && req.headers['x-real-ip'].trim()) {
+      rawIp = req.headers['x-real-ip'].trim();
+    } else if (typeof req.headers['cf-connecting-ip'] === 'string' && req.headers['cf-connecting-ip'].trim()) {
+      rawIp = req.headers['cf-connecting-ip'].trim();
+    } else if (typeof req.headers['x-client-ip'] === 'string' && req.headers['x-client-ip'].trim()) {
+      rawIp = req.headers['x-client-ip'].trim();
+    } else if (typeof req.headers['fastly-client-ip'] === 'string' && req.headers['fastly-client-ip'].trim()) {
+      rawIp = req.headers['fastly-client-ip'].trim();
+    } else if (typeof req.headers['true-client-ip'] === 'string' && req.headers['true-client-ip'].trim()) {
+      rawIp = req.headers['true-client-ip'].trim();
+    } else if (req.ip) {
+      rawIp = req.ip.trim();
+    } else if (req.socket?.remoteAddress) {
+      rawIp = req.socket.remoteAddress.trim();
+    }
+
+    // Normalize IPv6-mapped IPv4 e.g. ::ffff:158.140.166.38 -> 158.140.166.38
+    if (rawIp.startsWith('::ffff:')) {
+      rawIp = rawIp.slice(7);
+    }
+
+    return rawIp;
+  }
+
+  function getAllowedOfficeIps(): string[] {
+    const envIps = process.env.OFFICE_PUBLIC_IPS || '158.140.166.38';
+    return envIps
+      .split(',')
+      .map((ip) => ip.trim())
+      .filter((ip) => ip.length > 0);
+  }
+
   // API Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // =========================================================================
+  // API: NETWORK VERIFICATION FOR ROLE ACCESS CONTROL
+  // =========================================================================
+  app.post('/api/auth/verify-network', (req, res) => {
+    try {
+      const { uid, role } = req.body || {};
+      const normalizedRole = String(role || '').toUpperCase();
+      const requestPublicIp = extractClientIp(req);
+      const allowedOfficeIps = getAllowedOfficeIps();
+
+      let allowed = false;
+
+      // 1. OWNER and INVESTOR can login from anywhere
+      if (normalizedRole === 'OWNER' || normalizedRole === 'INVESTOR') {
+        allowed = true;
+      }
+      // 2. EMPLOYEE & MANAGER must originate from office public IP
+      else if (normalizedRole === 'EMPLOYEE' || normalizedRole === 'MANAGER') {
+        allowed = allowedOfficeIps.includes(requestPublicIp);
+      }
+      // 3. Fallback for undefined/unknown roles: require office network
+      else {
+        allowed = allowedOfficeIps.includes(requestPublicIp);
+      }
+
+      // Temporary server-side diagnostic logging (Requirement 15)
+      console.log('[LOGIN_NETWORK_CHECK]', {
+        role: normalizedRole,
+        uid: uid || 'anonymous',
+        requestPublicIp: requestPublicIp || 'unknown',
+        allowed: allowed,
+      });
+
+      if (!allowed) {
+        return res.status(403).json({
+          allowed: false,
+          code: 'OFFICE_NETWORK_REQUIRED',
+          message: 'Login karyawan hanya dapat dilakukan melalui jaringan kantor.',
+        });
+      }
+
+      return res.json({
+        allowed: true,
+        message: 'Network access granted.',
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/verify-network:', err);
+      return res.status(500).json({
+        allowed: false,
+        code: 'NETWORK_VERIFICATION_ERROR',
+        message: 'Gagal memverifikasi jaringan.',
+      });
+    }
   });
 
   // Lazy initialize Gemini client
