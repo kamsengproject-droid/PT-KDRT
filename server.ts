@@ -46,7 +46,7 @@ async function startServer() {
   // =========================================================================
   // API: SCAN SCREENSHOT PRODUK DARI MARKETPLACE (TIKTOK SHOP / SHOPEE)
   // =========================================================================
-  app.post('/api/scan-product', async (req, res) => {
+  const scanProductHandler = async (req: express.Request, res: express.Response) => {
     try {
       const { imageBase64, mimeType } = req.body;
 
@@ -156,7 +156,10 @@ Format output WAJIB HANYA JSON murni strictly valid sesuai schema:
         error: err.message || 'Gagal memproses screenshot dengan AI.',
       });
     }
-  });
+  };
+
+  app.post('/api/scan-product', scanProductHandler);
+  app.post('/api/scan-product-image', scanProductHandler);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

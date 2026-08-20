@@ -105,7 +105,7 @@ export const AbsensiEmployeePage: React.FC = () => {
           fotoBase64: dataUrl,
           schedule,
           holidays,
-          currentUserId: userProfile?.uid || currentUser?.uid || 'user-emp',
+          currentUserId: currentUser?.uid || userProfile?.uid || '',
           currentUserName: activeEmployeeName,
         });
 
@@ -122,7 +122,7 @@ export const AbsensiEmployeePage: React.FC = () => {
           employeeName: activeEmployeeName,
           fotoBase64: dataUrl,
           schedule,
-          currentUserId: userProfile?.uid || currentUser?.uid || 'user-emp',
+          currentUserId: currentUser?.uid || userProfile?.uid || '',
           currentUserName: activeEmployeeName,
         });
 

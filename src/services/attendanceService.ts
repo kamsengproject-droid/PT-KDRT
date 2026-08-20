@@ -249,6 +249,7 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
 
     return { id: docId, ...recordData };
   } catch (err) {
+    console.error('[ATTENDANCE_SAVE_ERROR]', err);
     handleFirestoreError(err, OperationType.WRITE, `attendance/${docId}`);
     throw new Error('Absensi gagal disimpan. Silakan coba lagi.');
   }
@@ -403,6 +404,7 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
 
     return { id: docId, ...existingData, ...updateData } as AttendanceRecord;
   } catch (err) {
+    console.error('[ATTENDANCE_SAVE_ERROR]', err);
     handleFirestoreError(err, OperationType.UPDATE, `attendance/${docId}`);
     throw new Error('Absensi gagal disimpan. Silakan coba lagi.');
   }

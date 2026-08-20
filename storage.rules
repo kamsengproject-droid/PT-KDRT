@@ -35,13 +35,13 @@ service firebase.storage {
 
     // 1. Attendance Selfies (Strictly internal & individual - Investor FORBIDDEN)
     match /attendance/{employeeId}/{allPaths=**} {
-      allow read: if isOwner() || isManager() || (isAuthenticated() && request.auth.uid == employeeId);
-      allow write: if (isOwner() || isManager() || (isAuthenticated() && request.auth.uid == employeeId)) && isImage();
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isImage();
     }
 
     match /attendance/{allPaths=**} {
-      allow read: if isOwner() || isManager() || isEmployee();
-      allow write: if (isOwner() || isManager() || isEmployee()) && isImage();
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isImage();
     }
 
     // 2. Receipts & Financial Invoices

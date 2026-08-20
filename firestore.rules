@@ -81,13 +81,13 @@ service cloud.firestore {
     // (Investor has NO access to selfies / GPS / internal HR)
     // ==========================================
     match /attendance/{attendanceId} {
-      allow read: if isOwner() || isManager() || !isAuthenticated() ||
-        (isAuthenticated() && (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
-      allow create: if !isAuthenticated() || 
-        (isAuthenticated() && (request.resource.data.get('employeeId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isOwner() || isManager()));
+      allow read: if isOwner() || isManager() || isEmployee() || !isAuthenticated() ||
+        (isAuthenticated() && (resource == null || resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+      allow create: if isOwner() || isManager() || !isAuthenticated() || 
+        (isAuthenticated() && (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('employeeId', '') == request.auth.uid || isEmployee()));
       allow update: if isOwner() || isManager() || !isAuthenticated() ||
         (isAuthenticated() && 
-         (resource.data.get('employeeId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid));
+         (resource.data.get('userId', '') == request.auth.uid || resource.data.get('employeeId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isEmployee()));
       allow delete: if isOwner();
     }
 
