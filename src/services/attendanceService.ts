@@ -87,9 +87,10 @@ export interface AbsenMasukParams {
   employeeId: string;
   employeeName: string;
   fotoBase64: string;
-  latitude: number;
-  longitude: number;
-  accuracy: number;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  validateGps?: boolean;
   schedule?: WorkplaceSchedule;
   office?: OfficeLocation;
   holidays?: Holiday[];
@@ -106,6 +107,7 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     latitude,
     longitude,
     accuracy,
+    validateGps = false,
     schedule = DEFAULT_SCHEDULE,
     office = { officeName: 'Kantor PT.KDRT', latitude: -6.2088, longitude: 106.8456, radius: 100 },
     holidays = [],
@@ -135,41 +137,45 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     }
   }
 
-  // 2. Validate GPS accuracy
-  const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
-  if (accuracy > accuracyLimit) {
-    await catatAuditLog(
-      currentUserId,
-      currentUserName,
-      'CHECK_IN_REJECTED',
-      employeeName,
-      `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
+  let distanceMeters = 0;
+
+  // 2. Optional GPS & Geofence validation (only if explicitly enabled)
+  if (validateGps && latitude !== undefined && longitude !== undefined && accuracy !== undefined) {
+    const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
+    if (accuracy > accuracyLimit) {
+      await catatAuditLog(
+        currentUserId,
+        currentUserName,
+        'CHECK_IN_REJECTED',
+        employeeName,
+        `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
+      );
+      throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
+    }
+
+    const geofenceResult = validasiGeofence(
+      latitude,
+      longitude,
+      accuracy,
+      office.latitude,
+      office.longitude,
+      office.radius
     );
-    throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
+
+    if (!geofenceResult.isWithin) {
+      await catatAuditLog(
+        currentUserId,
+        currentUserName,
+        'CHECK_IN_REJECTED',
+        employeeName,
+        `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
+      );
+      throw new Error('Anda berada di luar area kantor.');
+    }
+    distanceMeters = geofenceResult.distance;
   }
 
-  // 3. Geofence validation
-  const geofenceResult = validasiGeofence(
-    latitude,
-    longitude,
-    accuracy,
-    office.latitude,
-    office.longitude,
-    office.radius
-  );
-
-  if (!geofenceResult.isWithin) {
-    await catatAuditLog(
-      currentUserId,
-      currentUserName,
-      'CHECK_IN_REJECTED',
-      employeeName,
-      `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
-    );
-    throw new Error('Anda berada di luar area kantor.');
-  }
-
-  // 4. Determine time & status based on day-of-week schedule (Asia/Jakarta)
+  // 3. Determine time & status based on day-of-week schedule (Asia/Jakarta)
   const now = new Date();
   const timeStr = customTimeStr || formatJamPendek(now);
   const daySched = getJadwalHari(today, schedule);
@@ -187,11 +193,11 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     menitTerlambat = calc.menitTerlambat;
   }
 
-  // 5. Upload photo to Firebase Storage with 480p JPEG validation
+  // 4. Upload photo to Firebase Storage with 480p JPEG validation
   const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkin', fotoBase64);
 
-  // 6. Save attendance record to Firestore with serverTimestamp
-  const recordData: Omit<AttendanceRecord, 'id'> = {
+  // 5. Save attendance record to Firestore with serverTimestamp
+  const recordData: any = {
     userId: currentUserId,
     employeeId,
     employeeName,
@@ -205,14 +211,6 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     checkInPhotoUrl: uploadRes.photoUrl,
     fotoMasuk: uploadRes.photoUrl,
     checkInStoragePath: uploadRes.storagePath,
-    checkInLatitude: latitude,
-    latitude,
-    checkInLongitude: longitude,
-    longitude,
-    checkInGpsAccuracy: accuracy,
-    accuracy,
-    checkInDistance: geofenceResult.distance,
-    distanceFromOffice: geofenceResult.distance,
 
     // Photo metadata
     photoWidth: uploadRes.photoWidth,
@@ -233,6 +231,11 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     createdBy: currentUserId,
   };
 
+  if (latitude !== undefined) recordData.latitude = latitude;
+  if (longitude !== undefined) recordData.longitude = longitude;
+  if (accuracy !== undefined) recordData.accuracy = accuracy;
+  if (distanceMeters > 0) recordData.distanceFromOffice = distanceMeters;
+
   try {
     await setDoc(docRef, recordData, { merge: true });
 
@@ -241,7 +244,7 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
       currentUserName,
       'CHECK_IN_SUCCESS',
       employeeName,
-      `Absen Masuk: ${timeStr} WIB (${daySched.namaHari}, Jadwal: ${daySched.checkInTime} WIB), Status: ${status}${menitTerlambat > 0 ? ` (Terlambat ${menitTerlambat} menit)` : ''}, Jarak: ${geofenceResult.distance}m`
+      `Absen Masuk: ${timeStr} WIB (${daySched.namaHari}, Jadwal: ${daySched.checkInTime} WIB), Status: ${status}${menitTerlambat > 0 ? ` (Terlambat ${menitTerlambat} menit)` : ''}`
     );
 
     return { id: docId, ...recordData };
@@ -255,9 +258,10 @@ export interface AbsenPulangParams {
   employeeId: string;
   employeeName: string;
   fotoBase64: string;
-  latitude: number;
-  longitude: number;
-  accuracy: number;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  validateGps?: boolean;
   schedule?: WorkplaceSchedule;
   office?: OfficeLocation;
   currentUserId: string;
@@ -273,6 +277,7 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     latitude,
     longitude,
     accuracy,
+    validateGps = false,
     schedule = DEFAULT_SCHEDULE,
     office = { officeName: 'Kantor PT.KDRT', latitude: -6.2088, longitude: 106.8456, radius: 100 },
     currentUserId,
@@ -310,41 +315,45 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     throw new Error('Anda sudah melakukan absen pulang hari ini.');
   }
 
-  // 2. Validate GPS accuracy on Check-Out
-  const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
-  if (accuracy > accuracyLimit) {
-    await catatAuditLog(
-      currentUserId,
-      currentUserName,
-      'CHECK_OUT_REJECTED',
-      employeeName,
-      `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
+  let distanceMeters = 0;
+
+  // 2. Optional GPS & Geofence validation
+  if (validateGps && latitude !== undefined && longitude !== undefined && accuracy !== undefined) {
+    const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
+    if (accuracy > accuracyLimit) {
+      await catatAuditLog(
+        currentUserId,
+        currentUserName,
+        'CHECK_OUT_REJECTED',
+        employeeName,
+        `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
+      );
+      throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
+    }
+
+    const geofenceResult = validasiGeofence(
+      latitude,
+      longitude,
+      accuracy,
+      office.latitude,
+      office.longitude,
+      office.radius
     );
-    throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
+
+    if (!geofenceResult.isWithin) {
+      await catatAuditLog(
+        currentUserId,
+        currentUserName,
+        'CHECK_OUT_REJECTED',
+        employeeName,
+        `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
+      );
+      throw new Error('Anda berada di luar area kantor.');
+    }
+    distanceMeters = geofenceResult.distance;
   }
 
-  // 3. Geofence validation on Check-Out
-  const geofenceResult = validasiGeofence(
-    latitude,
-    longitude,
-    accuracy,
-    office.latitude,
-    office.longitude,
-    office.radius
-  );
-
-  if (!geofenceResult.isWithin) {
-    await catatAuditLog(
-      currentUserId,
-      currentUserName,
-      'CHECK_OUT_REJECTED',
-      employeeName,
-      `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
-    );
-    throw new Error('Anda berada di luar area kantor.');
-  }
-
-  // 4. Calculate day schedule and early checkout status
+  // 3. Calculate day schedule and early checkout status
   const now = new Date();
   const timeStr = customTimeStr || formatJamPendek(now);
   const daySched = getJadwalHari(today, schedule);
@@ -354,30 +363,28 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     daySched.earlyCheckoutToleranceMinutes
   );
 
-  // 5. Upload photo to Firebase Storage
+  // 4. Upload photo to Firebase Storage
   const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkout', fotoBase64);
 
-  const updateData = {
+  const updateData: any = {
     checkOutAt: serverTimestamp(),
     checkOutTime: timeStr,
     waktuPulang: timeStr,
     checkOutPhotoUrl: uploadRes.photoUrl,
     fotoPulang: uploadRes.photoUrl,
     checkOutStoragePath: uploadRes.storagePath,
-    checkOutLatitude: latitude,
-    latitudePulang: latitude,
-    checkOutLongitude: longitude,
-    longitudePulang: longitude,
-    checkOutGpsAccuracy: accuracy,
-    accuracyPulang: accuracy,
-    checkOutDistance: geofenceResult.distance,
-    jadwalPulang: daySched.checkOutTime,
     statusPulang: checkoutCalc.statusPulang,
     checkoutStatus: checkoutCalc.checkoutStatus,
     isEarlyCheckout: checkoutCalc.isEarlyCheckout,
     earlyCheckoutMinutes: checkoutCalc.earlyCheckoutMinutes,
     updatedAt: serverTimestamp(),
+    updatedBy: currentUserId,
   };
+
+  if (latitude !== undefined) updateData.latitudePulang = latitude;
+  if (longitude !== undefined) updateData.longitudePulang = longitude;
+  if (accuracy !== undefined) updateData.accuracyPulang = accuracy;
+  if (distanceMeters > 0) updateData.distanceFromOffice = distanceMeters;
 
   try {
     await updateDoc(docRef, updateData);
@@ -391,7 +398,7 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
       currentUserName,
       'CHECK_OUT_SUCCESS',
       employeeName,
-      `Absen Pulang: ${timeStr} WIB (${daySched.namaHari}), Status: ${logDetail}, Jarak: ${geofenceResult.distance}m`
+      `Absen Pulang: ${timeStr} WIB (${daySched.namaHari}), Status: ${logDetail}${distanceMeters > 0 ? `, Jarak: ${distanceMeters}m` : ''}`
     );
 
     return { id: docId, ...existingData, ...updateData } as AttendanceRecord;

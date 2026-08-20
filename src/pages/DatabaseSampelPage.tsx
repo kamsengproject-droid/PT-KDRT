@@ -40,6 +40,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProductScanModal } from '../components/sample/ProductScanModal';
+import { AddProductSampleModal } from '../components/sample/AddProductSampleModal';
+import { AIScanResult } from '../services/aiScanService';
 import {
   AffiliateSample,
   SampleStatus,
@@ -116,7 +118,11 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   // AI Screenshot Scan Modal state
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
 
-  // Chooser Modal State (+ TAMBAH PRODUK)
+  // Unified Single Entry Modal State (+ TAMBAH PRODUK / SAMPEL)
+  const [isAddProductSampleModalOpen, setIsAddProductSampleModalOpen] = useState<boolean>(false);
+  const [scanDataForUnifiedForm, setScanDataForUnifiedForm] = useState<AIScanResult | null>(null);
+
+  // Chooser Modal State (+ TAMBAH PRODUK / SAMPEL)
   const [showAddChooser, setShowAddChooser] = useState<boolean>(false);
 
   // Product Form Modal
@@ -677,27 +683,26 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
         </div>
 
         {/* Big Action Buttons */}
-        {!isInvestor && (role !== 'EMPLOYEE' || employeeProfile?.permissions?.canCreateSampleProduct) && (
+        {!isInvestor && (role !== 'EMPLOYEE' || employeeProfile?.permissions?.canCreateSampleProduct || isEmployee) && (
           <div className="flex items-center gap-3 flex-wrap">
             {/* Direct AI Scan Button */}
-            {!isEmployee && (
-              <button
-                type="button"
-                id="btn-scan-screenshot-produk"
-                onClick={() => setIsScanModalOpen(true)}
-                className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white px-5 py-4 text-sm font-black shadow-lg shadow-emerald-600/25 transition-all cursor-pointer border border-emerald-400/30"
-              >
-                <Camera className="h-5 w-5" />
-                <span>📷 SCAN SCREENSHOT PRODUK</span>
-              </button>
-            )}
+            <button
+              type="button"
+              id="btn-scan-screenshot-produk"
+              onClick={() => setIsScanModalOpen(true)}
+              className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white px-5 py-4 text-sm font-black shadow-lg shadow-emerald-600/25 transition-all cursor-pointer border border-emerald-400/30"
+            >
+              <Camera className="h-5 w-5" />
+              <span>📷 SCAN SCREENSHOT PRODUK</span>
+            </button>
 
             <button
+              id="btn-tambah-produk-sampel"
               onClick={() => setShowAddChooser(true)}
               className="inline-flex items-center gap-2.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white px-5 py-4 text-sm font-black shadow-lg transition-all cursor-pointer border border-zinc-700"
             >
               <Plus className="h-5 w-5 stroke-[3]" />
-              <span>+ TAMBAH DATA</span>
+              <span>+ TAMBAH PRODUK / SAMPEL</span>
             </button>
 
             {/* Modal Chooser popup */}
@@ -707,7 +712,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                   <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                     <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                       <Package className="h-5 w-5 text-emerald-600" />
-                      TAMBAH DATA PRODUK & SAMPEL
+                      TAMBAH PRODUK SAMPEL
                     </h3>
                     <button
                       onClick={() => setShowAddChooser(false)}
@@ -717,76 +722,57 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                     </button>
                   </div>
 
-                  <p className="text-xs text-zinc-500">
-                    Pilih cara penambahan data yang Anda inginkan:
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Satu kali proses input terpadu untuk katalog produk dan sampel affiliate:
                   </p>
 
                   <div className="grid grid-cols-1 gap-3 pt-1">
-                    {!isEmployee && (
-                      <>
-                        {/* Option 0: Scan Screenshot AI */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddChooser(false);
-                            setIsScanModalOpen(true);
-                          }}
-                          className="group flex items-start gap-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/50 p-4 text-left hover:border-emerald-600 hover:bg-emerald-100/60 transition-all cursor-pointer"
-                        >
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white group-hover:scale-105 transition-transform shadow-md">
-                            <Camera className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-black text-sm text-emerald-950 flex items-center gap-1.5">
-                                [ 📷 SCAN SCREENSHOT ]
-                              </h4>
-                              <span className="text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded">
-                                AI AUTO-FILL
-                              </span>
-                            </div>
-                            <p className="text-xs text-emerald-800 mt-1">
-                              Upload screenshot TikTok Shop / Shopee. AI mengisi form otomatis.
-                            </p>
-                          </div>
-                        </button>
-
-                        {/* Option 1: Master Produk Manual */}
-                        <button
-                          type="button"
-                          onClick={handleOpenAddProduct}
-                          className="group flex items-start gap-4 rounded-2xl border-2 border-zinc-200 bg-white p-4 text-left hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer"
-                        >
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                            <ShoppingBag className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <h4 className="font-black text-sm text-zinc-900 group-hover:text-emerald-800 flex items-center gap-1.5">
-                              [ PRODUK BARU MANUAL ]
-                            </h4>
-                            <p className="text-xs text-zinc-500 mt-1">
-                              Input manual katalog barang, harga, komisi & link toko.
-                            </p>
-                          </div>
-                        </button>
-                      </>
-                    )}
-
-                    {/* Option 2: Sampel Produk */}
+                    {/* Option 0: Scan Screenshot AI */}
                     <button
                       type="button"
-                      onClick={handleOpenAddSample}
+                      onClick={() => {
+                        setShowAddChooser(false);
+                        setIsScanModalOpen(true);
+                      }}
+                      className="group flex items-start gap-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/50 p-4 text-left hover:border-emerald-600 hover:bg-emerald-100/60 transition-all cursor-pointer"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white group-hover:scale-105 transition-transform shadow-md">
+                        <Camera className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-black text-sm text-emerald-950 flex items-center gap-1.5">
+                            [ 📷 SCAN SCREENSHOT ]
+                          </h4>
+                          <span className="text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded">
+                            AI AUTO-FILL
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-800 mt-1">
+                          Upload screenshot TikTok Shop / Shopee. AI mengisi form produk & sampel otomatis.
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Option 1: Input Manual Single Entry */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddChooser(false);
+                        setScanDataForUnifiedForm(null);
+                        setIsAddProductSampleModalOpen(true);
+                      }}
                       className="group flex items-start gap-4 rounded-2xl border-2 border-zinc-200 bg-white p-4 text-left hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                        <Package className="h-6 w-6" />
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <ShoppingBag className="h-6 w-6" />
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-zinc-900 group-hover:text-emerald-800 flex items-center gap-1.5">
-                          [ SAMPEL BARU ]
+                          [ ✏️ INPUT MANUAL ]
                         </h4>
                         <p className="text-xs text-zinc-500 mt-1">
-                          Mencatat sampel barang yang datang untuk pembuatan konten VT.
+                          Formulir tunggal: isi data produk, pilih beli sampel (Ya/Tidak), dan simpan sekaligus.
                         </p>
                       </div>
                     </button>
@@ -1941,11 +1927,49 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
         currentUserName={userProfile?.name || 'User'}
         defaultScope={isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI')}
         canChooseScope={!isEmployee && !isInvestor}
+        onScanExtracted={(extractedData) => {
+          setScanDataForUnifiedForm(extractedData);
+          setIsAddProductSampleModalOpen(true);
+        }}
         onProductCreated={(newProd, autoOpenSample) => {
           setProducts((prev) => [newProd, ...prev.filter((p) => p.id !== newProd.id)]);
           setSuccessToast(`Produk "${newProd.productName}" berhasil ditambahkan ke Katalog.`);
           if (autoOpenSample) {
             handleOpenBuySample(newProd);
+          }
+        }}
+      />
+
+      {/* ================= MODAL: SINGLE ENTRY PRODUK & SAMPEL ================= */}
+      <AddProductSampleModal
+        isOpen={isAddProductSampleModalOpen}
+        onClose={() => {
+          setIsAddProductSampleModalOpen(false);
+          setScanDataForUnifiedForm(null);
+        }}
+        accounts={accounts}
+        employees={employees}
+        existingProducts={products}
+        currentUserId={userProfile?.uid || 'anonymous'}
+        currentUserName={userProfile?.name || 'User'}
+        defaultScope={isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI')}
+        canChooseScope={!isEmployee && !isInvestor}
+        initialScanData={scanDataForUnifiedForm}
+        onOpenScanModal={() => {
+          setIsAddProductSampleModalOpen(false);
+          setIsScanModalOpen(true);
+        }}
+        onSaved={({ product, sample }) => {
+          if (product) {
+            setProducts((prev) => [product, ...prev.filter((p) => p.id !== product.id)]);
+          }
+          if (sample) {
+            setSamples((prev) => [sample, ...prev.filter((s) => s.id !== sample.id)]);
+          }
+          if (sample) {
+            setSuccessToast(`Master produk "${product.productName}" dan data sampel fisik berhasil disimpan.`);
+          } else {
+            setSuccessToast(`Master produk "${product.productName}" berhasil disimpan ke Katalog.`);
           }
         }}
       />

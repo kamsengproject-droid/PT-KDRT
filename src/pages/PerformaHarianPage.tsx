@@ -21,8 +21,16 @@ export const PerformaHarianPage: React.FC<{ onBackToPortal?: () => void }> = ({ 
       const snap = await getDocs(q);
       let accs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
       
-      if (role === 'EMPLOYEE' && employeeProfile?.permissions?.canViewSpecificAccounts && employeeProfile.permissions.canViewSpecificAccounts.length > 0) {
-        accs = accs.filter(a => employeeProfile.permissions!.canViewSpecificAccounts!.includes(a.id));
+      if (role === 'EMPLOYEE') {
+        const allowed = employeeProfile?.permissions?.canViewSpecificAccounts || [];
+        if (allowed.length > 0) {
+          accs = accs.filter(a => 
+            allowed.includes(a.id || '') || 
+            allowed.some(allowedName => (a.accountName || '').toUpperCase().includes(allowedName.toUpperCase()))
+          );
+        } else if (employeeProfile?.name?.toLowerCase().includes('desta') || employeeProfile?.position?.toLowerCase().includes('editor')) {
+          accs = accs.filter(a => (a.accountName || '').toUpperCase().includes('NISAGROSIR88'));
+        }
       }
       
       setAccounts(accs);
@@ -37,7 +45,11 @@ export const PerformaHarianPage: React.FC<{ onBackToPortal?: () => void }> = ({ 
     const scopeAccounts = accounts.filter(a => a.scope === scopeFilter);
     const scopeAccountIds = new Set(scopeAccounts.map(a => a.id));
     
-    const scopePerformances = performances.filter(p => p.scope === scopeFilter || scopeAccountIds.has(p.accountId));
+    const scopePerformances = performances.filter(p => 
+      role === 'EMPLOYEE' 
+        ? scopeAccountIds.has(p.accountId) || scopeAccounts.some(acc => acc.accountName === p.accountName)
+        : (p.scope === scopeFilter || scopeAccountIds.has(p.accountId))
+    );
     
     let gHariIni = 0;
     let kHariIni = 0;

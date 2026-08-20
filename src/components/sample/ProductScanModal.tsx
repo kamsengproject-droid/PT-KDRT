@@ -41,6 +41,7 @@ interface ProductScanModalProps {
   defaultScope: ScopeType;
   canChooseScope: boolean;
   onProductCreated: (newProduct: Product, autoOpenSampleOrder?: boolean) => void;
+  onScanExtracted?: (scanResult: AIScanResult) => void;
 }
 
 const KATEGORI_OPTIONS = [
@@ -66,6 +67,7 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
   defaultScope,
   canChooseScope,
   onProductCreated,
+  onScanExtracted,
 }) => {
   // Step state: 'UPLOAD' | 'SCANNING' | 'REVIEW' | 'SUCCESS'
   const [step, setStep] = useState<'UPLOAD' | 'SCANNING' | 'REVIEW' | 'SUCCESS'>('UPLOAD');
@@ -825,7 +827,7 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
                   ← Scan Ulang
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     type="button"
                     onClick={onClose}
@@ -833,6 +835,30 @@ export const ProductScanModal: React.FC<ProductScanModalProps> = ({
                   >
                     Batal
                   </button>
+
+                  {onScanExtracted && scanResult && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const finalImage = activeImageChoice === 'CROPPED' && croppedPreview ? croppedPreview : (filePreview || '');
+                        onScanExtracted({
+                          ...scanResult,
+                          productName: productName,
+                          productPrice: Number(productPrice) || 0,
+                          productUrl: productUrl,
+                          platform: platform,
+                          category: category,
+                          productImageUrl: finalImage,
+                        });
+                        onClose();
+                      }}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 transition-all cursor-pointer"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>[ 📝 LANJUTKAN KE FORMULIR INPUT ]</span>
+                    </button>
+                  )}
+
                   <button
                     type="submit"
                     disabled={isSubmitting || (duplicates.length > 0 && !ignoreDuplicates)}

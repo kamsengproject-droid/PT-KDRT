@@ -72,21 +72,24 @@ export async function getEmployeeByUserId(userId: string): Promise<Employee | nu
     if (!snap.empty) {
       const emp = { id: snap.docs[0].id, ...snap.docs[0].data() } as Employee;
       
-      // Inject hardcoded granular permissions based on name if not set
+      // Inject hardcoded granular permissions based on name/position if not set
       if (!emp.permissions) {
-        if (emp.name === 'Desta') {
+        const lowerName = (emp.name || '').toLowerCase();
+        const lowerPos = (emp.position || '').toLowerCase();
+
+        if (lowerName.includes('desta') || lowerPos.includes('editor')) {
           emp.permissions = {
             canViewAttendance: true,
             canManageOwnProfile: true,
             canChangeOwnPassword: true,
             canViewSampleProducts: true,
-            canCreateSampleProduct: false,
+            canCreateSampleProduct: true,
             canInputCommissionReal: true,
             canViewOmset: true,
             canViewSharingOmset: true,
             canViewSpecificAccounts: ['NISAGROSIR88']
           };
-        } else if (emp.name === 'Melinda Putri') {
+        } else if (lowerName.includes('melinda') || lowerPos.includes('talent')) {
           emp.permissions = {
             canViewAttendance: true,
             canManageOwnProfile: true,
@@ -105,7 +108,7 @@ export async function getEmployeeByUserId(userId: string): Promise<Employee | nu
             canManageOwnProfile: true,
             canChangeOwnPassword: true,
             canViewSampleProducts: true,
-            canCreateSampleProduct: false,
+            canCreateSampleProduct: true,
             canInputCommissionReal: false,
             canViewOmset: false,
             canViewSharingOmset: false,

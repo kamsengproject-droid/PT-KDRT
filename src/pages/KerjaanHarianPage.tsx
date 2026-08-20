@@ -70,12 +70,13 @@ interface KerjaanHarianPageProps {
 }
 
 export const KerjaanHarianPage: React.FC<KerjaanHarianPageProps> = ({ onBackToPortal }) => {
-  const { role, userProfile, loading: authLoading, currentUser } = useAuth();
+  const { role, userProfile, employeeProfile, loading: authLoading, currentUser } = useAuth();
   const isOwner = role === 'OWNER';
   const isManager = role === 'MANAGER';
   const isEmployee = role === 'EMPLOYEE';
-  const currentUserId = userProfile?.employeeId || userProfile?.uid || '';
-  const currentUserName = userProfile?.name || 'Pengguna';
+  const activeEmployeeId = employeeProfile?.id || userProfile?.employeeId || (userProfile?.name === 'Desta' ? 'desta-id' : 'melinda-id');
+  const currentUserId = userProfile?.uid || currentUser?.uid || activeEmployeeId;
+  const currentUserName = employeeProfile?.name || userProfile?.name || 'Pengguna';
 
   // Date State (Defaults to Today WIB)
   const [selectedDate, setSelectedDate] = useState<string>(tanggalHariIni());
@@ -137,10 +138,19 @@ export const KerjaanHarianPage: React.FC<KerjaanHarianPageProps> = ({ onBackToPo
     let unsubTasks: () => void;
 
     if (isEmployee) {
-      unsubTasks = subscribeDailyTasksByEmployee(currentUserId, selectedDate, (list) => {
-        setTasks(list);
-        setIsLoading(false);
-      });
+      unsubTasks = subscribeDailyTasksByEmployee(
+        {
+          employeeId: activeEmployeeId,
+          assigneeEmployeeId: activeEmployeeId,
+          userId: currentUserId,
+          employeeName: currentUserName,
+        },
+        selectedDate,
+        (list) => {
+          setTasks(list);
+          setIsLoading(false);
+        }
+      );
     } else {
       unsubTasks = subscribeDailyTasks(
         { tanggal: selectedDate },
@@ -154,7 +164,17 @@ export const KerjaanHarianPage: React.FC<KerjaanHarianPageProps> = ({ onBackToPo
     return () => {
       if (unsubTasks) unsubTasks();
     };
-  }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active, isEmployee, currentUserId, selectedDate]);
+  }, [
+    authLoading,
+    currentUser?.uid,
+    userProfile?.role,
+    userProfile?.active,
+    isEmployee,
+    activeEmployeeId,
+    currentUserId,
+    currentUserName,
+    selectedDate,
+  ]);
 
   // Date Quick Navigation
   const handlePrevDay = () => {

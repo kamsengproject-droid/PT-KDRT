@@ -89,14 +89,28 @@ export function subscribeDailyTasks(
 }
 
 export function subscribeDailyTasksByEmployee(
-  employeeId: string,
+  employeeIdentifier:
+    | string
+    | { employeeId?: string; assigneeEmployeeId?: string; userId?: string; employeeName?: string },
   tanggal?: string,
   callback?: (tasks: DailyTask[]) => void
 ) {
-  let q = query(
-    collection(db, TASKS_COLLECTION),
-    where('employeeId', '==', employeeId)
-  );
+  let q: any = collection(db, TASKS_COLLECTION);
+  if (tanggal) {
+    q = query(collection(db, TASKS_COLLECTION), where('tanggal', '==', tanggal));
+  }
+
+  const idsToMatch = new Set<string>();
+  let nameFallback = '';
+
+  if (typeof employeeIdentifier === 'string') {
+    if (employeeIdentifier) idsToMatch.add(employeeIdentifier);
+  } else if (employeeIdentifier) {
+    if (employeeIdentifier.employeeId) idsToMatch.add(employeeIdentifier.employeeId);
+    if (employeeIdentifier.assigneeEmployeeId) idsToMatch.add(employeeIdentifier.assigneeEmployeeId);
+    if (employeeIdentifier.userId) idsToMatch.add(employeeIdentifier.userId);
+    if (employeeIdentifier.employeeName) nameFallback = employeeIdentifier.employeeName.toLowerCase().trim();
+  }
 
   return onSnapshot(
     q,
@@ -112,6 +126,24 @@ export function subscribeDailyTasksByEmployee(
         const timeB = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : (b.createdAt ? new Date(b.createdAt as any).getTime() : 0);
         return timeB - timeA;
       });
+
+      if (idsToMatch.size > 0 || nameFallback) {
+        tasks = tasks.filter((t: any) => {
+          const idMatch =
+            (t.employeeId && idsToMatch.has(t.employeeId)) ||
+            (t.assigneeEmployeeId && idsToMatch.has(t.assigneeEmployeeId)) ||
+            (t.userId && idsToMatch.has(t.userId)) ||
+            (t.assigneeId && idsToMatch.has(t.assigneeId));
+
+          if (idMatch) return true;
+
+          // Fallback if employeeName matches
+          if (nameFallback && t.employeeName && t.employeeName.toLowerCase().trim() === nameFallback) {
+            return true;
+          }
+          return false;
+        });
+      }
 
       if (tanggal) {
         tasks = tasks.filter((t) => t.tanggal === tanggal);
