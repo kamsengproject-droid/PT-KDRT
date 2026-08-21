@@ -13,7 +13,9 @@ import {
   getDocs,
   getDoc,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, storage, handleFirestoreError, OperationType } from '../firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { compressImageFile } from '../utils/imageCompressor';
 import {
   AffiliateSample,
   SampleStatus,
@@ -28,6 +30,27 @@ import { createFinancialTransaction } from './transactionService';
 import { tanggalHariIni } from '../utils/formatters';
 
 export const SAMPLES_COLLECTION = 'samples';
+
+// Upload sample photo to Firebase Storage. Reuses the same compression helper
+// (compressImageFile) and upload pattern already used by productService's
+// uploadProductPhoto — just a different storage folder, since this is a
+// distinct photo (sample condition photo) from the master product photo.
+export async function uploadSampleImage(file: File, sampleTempId: string): Promise<string> {
+  const compressed = await compressImageFile(file, 1000, 1000, 0.82);
+  const timestamp = Date.now();
+  const storagePath = `samples/${sampleTempId}_${timestamp}.jpg`;
+  const storageRef = ref(storage, storagePath);
+
+  await uploadBytes(storageRef, compressed.blob, {
+    contentType: compressed.mimeType,
+    customMetadata: {
+      uploadedAt: new Date().toISOString(),
+      originalFileName: file.name,
+    },
+  });
+
+  return getDownloadURL(storageRef);
+}
 
 /**
  * Deterministic Task Synchronizer
@@ -223,10 +246,20 @@ export async function createSample(
   };
 
   try {
+    console.time('[SAMPLE_SAVE_TOTAL]');
+    console.log('[SAMPLE_SAVE_START]', { productName: sampleData.productName });
+
     const docRef = await addDoc(collection(db, SAMPLES_COLLECTION), payload);
     const sampleId = docRef.id;
+    console.log('[SAMPLE_SAMPLE_WRITE]', { sampleId });
 
-    await catatAuditLog(
+    // The 3 branches below are independent of each other (different collections,
+    // none reads the others' output), so they run in parallel instead of a
+    // sequential await chain. Anti-duplicate / deterministic-ID logic inside each
+    // branch is untouched — only the *ordering between branches* changed.
+
+    // Branch 1: Audit log for the creation itself
+    const auditPromise = catatAuditLog(
       currentUserId,
       currentUserName,
       'SAMPLE_CREATED',
@@ -234,31 +267,50 @@ export async function createSample(
       `ID: ${sampleId}, Qty: ${quantity}, Biaya: Rp ${totalCost.toLocaleString('id-ID')}, Status: ${payload.status}`
     );
 
-    // Optional: Auto Create Financial Expense with anti-double-entry
-    if (autoCreateExpense && totalCost > 0) {
-      try {
-        await recordSampleExpense(sampleId, { ...payload, id: sampleId }, currentUserId, currentUserName);
-      } catch (expErr: any) {
-        console.warn('Auto expense recording notice:', expErr.message);
-      }
-    }
+    // Branch 2: Auto Create Financial Expense with anti-double-entry
+    // skipDuplicateCheck=true is safe here ONLY because sampleId was just generated
+    // by addDoc above — no prior expense could possibly reference an ID that didn't exist yet.
+    const expensePromise =
+      autoCreateExpense && totalCost > 0
+        ? (async () => {
+            console.time('[SAMPLE_EXPENSE_WRITE]');
+            try {
+              await recordSampleExpense(sampleId, { ...payload, id: sampleId }, currentUserId, currentUserName, true);
+            } catch (expErr: any) {
+              console.warn('Auto expense recording notice:', expErr.message);
+            } finally {
+              console.timeEnd('[SAMPLE_EXPENSE_WRITE]');
+            }
+          })()
+        : Promise.resolve();
 
-    // Auto Link & Sync to Daily Task with Deterministic ID: sampleTask_${sampleId}
-    if (sampleData.scope === 'SHARING' && sampleData.employeeId) {
-      try {
-        const taskId = await syncSampleToDailyTask(
-          sampleId,
-          { ...payload, id: sampleId },
-          currentUserId,
-          currentUserName
-        );
-        if (taskId) {
-          await updateDoc(docRef, { taskId: taskId });
-        }
-      } catch (taskErr: any) {
-        console.warn('Auto task sync notice:', taskErr.message);
-      }
-    }
+    // Branch 3: Auto Link & Sync to Daily Task with Deterministic ID: sampleTask_${sampleId}
+    const taskPromise =
+      sampleData.scope === 'SHARING' && sampleData.employeeId
+        ? (async () => {
+            console.time('[SAMPLE_TASK_SYNC]');
+            try {
+              const taskId = await syncSampleToDailyTask(
+                sampleId,
+                { ...payload, id: sampleId },
+                currentUserId,
+                currentUserName
+              );
+              if (taskId) {
+                await updateDoc(docRef, { taskId: taskId });
+              }
+            } catch (taskErr: any) {
+              console.warn('Auto task sync notice:', taskErr.message);
+            } finally {
+              console.timeEnd('[SAMPLE_TASK_SYNC]');
+            }
+          })()
+        : Promise.resolve();
+
+    await Promise.all([auditPromise, expensePromise, taskPromise]);
+
+    console.log('[SAMPLE_SAVE_END]', { sampleId });
+    console.timeEnd('[SAMPLE_SAVE_TOTAL]');
 
     return sampleId;
   } catch (error) {
@@ -290,20 +342,48 @@ export async function updateSample(
   };
 
   try {
+    console.time('[SAMPLE_UPDATE_TOTAL]');
+    console.log('[SAMPLE_SAVE_START]', { id, productName: payload.productName });
+
     const docRef = doc(db, SAMPLES_COLLECTION, id);
     await updateDoc(docRef, payload);
+    console.log('[SAMPLE_SAMPLE_WRITE]', { id });
+
+    // If the sample photo was replaced or removed, clean up the old Storage object
+    // after the Firestore URL has been updated. A cleanup failure must never roll back
+    // an otherwise successful sample update.
+    if (currentSample.sampleImage && Object.prototype.hasOwnProperty.call(updates, 'sampleImage') && updates.sampleImage !== currentSample.sampleImage) {
+      try {
+        await deleteObject(ref(storage, currentSample.sampleImage));
+      } catch (cleanupErr) {
+        console.warn('[SAMPLE_IMAGE_CLEANUP]', { id, error: cleanupErr });
+      }
+    }
 
     // Synchronize linked dailyTask deterministically (handles PIC transfer, scope changes, target changes)
     const mergedSample = { ...currentSample, ...payload, id };
-    await syncSampleToDailyTask(id, mergedSample, currentUserId, currentUserName);
 
-    await catatAuditLog(
-      currentUserId,
-      currentUserName,
-      'SAMPLE_UPDATED',
-      `Sampel: ${updates.productName || currentSample.productName}`,
-      `Update data sampel ID ${id}. Total Biaya: Rp ${totalCost.toLocaleString('id-ID')}`
-    );
+    // Task sync and audit log are independent writes to different collections — run in parallel.
+    await Promise.all([
+      (async () => {
+        console.time('[SAMPLE_TASK_SYNC]');
+        try {
+          await syncSampleToDailyTask(id, mergedSample, currentUserId, currentUserName);
+        } finally {
+          console.timeEnd('[SAMPLE_TASK_SYNC]');
+        }
+      })(),
+      catatAuditLog(
+        currentUserId,
+        currentUserName,
+        'SAMPLE_UPDATED',
+        `Sampel: ${updates.productName || currentSample.productName}`,
+        `Update data sampel ID ${id}. Total Biaya: Rp ${totalCost.toLocaleString('id-ID')}`
+      ),
+    ]);
+
+    console.log('[SAMPLE_SAVE_END]', { id });
+    console.timeEnd('[SAMPLE_UPDATE_TOTAL]');
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${SAMPLES_COLLECTION}/${id}`);
     throw error;
@@ -395,7 +475,8 @@ export async function recordSampleExpense(
   sampleId: string,
   sample: AffiliateSample,
   currentUserId: string,
-  currentUserName: string
+  currentUserName: string,
+  _skipDuplicateCheck: boolean = false
 ): Promise<{ success: boolean; message: string; expenseId?: string }> {
   try {
     // Check 1: In sample document itself
@@ -414,8 +495,14 @@ export async function recordSampleExpense(
       };
     }
 
-    // Check 2: Query Firestore 'expenses' collection for any doc with sampleId
+    // Check 2: Query Firestore 'expenses' collection for any doc with sampleId.
+    // Keep this check enabled even for fresh creates. It is a cheap read compared with
+    // the cost of allowing a retry to create a second expense after a partial failure.
+    // The flag is retained for API compatibility but intentionally no longer bypasses
+    // the anti-duplicate check.
     const expensesCol = collection(db, 'expenses');
+    void _skipDuplicateCheck; // retained for backwards-compatible callers; anti-duplicate check is always enforced.
+
     const q = query(expensesCol, where('sampleId', '==', sampleId));
     const existingSnap = await getDocs(q);
 
@@ -442,7 +529,6 @@ export async function recordSampleExpense(
         expenseId: existingDoc.id,
       };
     }
-
     // Amount to record
     const amount = Number(sample.totalCost) > 0 ? Number(sample.totalCost) : Number(sample.samplePrice) * Number(sample.quantity);
 
@@ -559,4 +645,3 @@ export async function deleteSample(
     throw error;
   }
 }
-

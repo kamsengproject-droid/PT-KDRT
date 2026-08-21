@@ -58,6 +58,7 @@ import {
   updateSampleStatus,
   updateSampleContentProgress,
   deleteSample,
+  uploadSampleImage,
 } from '../services/sampleService';
 import {
   subscribeProducts,
@@ -107,6 +108,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   const isManager = role === 'MANAGER';
   const isEmployee = role === 'EMPLOYEE';
   const isInvestor = role === 'INVESTOR';
+  // Sharing employees (e.g. Melinda, Desta) get the restricted Fashion category set.
+  // Employees on PRIBADI scope still see the full master category list.
+  const isSharingEmployee = isEmployee && userProfile?.scope === 'SHARING';
 
   // Data states
   const [samples, setSamples] = useState<AffiliateSample[]>([]);
@@ -153,7 +157,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     productImage: '',
     commissionRate: 10,
     accountIds: [],
-    category: isEmployee ? 'Fashion Kaos' : 'Skincare & Kecantikan',
+    category: isSharingEmployee ? 'Fashion Kaos' : 'Skincare & Kecantikan',
     scope: isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI'),
     status: 'AKTIF',
     notes: '',
@@ -181,6 +185,8 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     autoCreateExpense: boolean;
     autoCreateTask: boolean;
     notes: string;
+    sellerName: string;
+    brandName: string;
   }>({
     productId: '',
     productName: '',
@@ -190,7 +196,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     purchaseDate: tanggalHariIni(),
     quantity: '',
     totalCost: '',
-    status: 'DIPESAN',
+    status: 'DITERIMA',
     accountId: '',
     employeeId: '',
     targetContent: '',
@@ -200,7 +206,26 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     autoCreateExpense: true,
     autoCreateTask: true,
     notes: '',
+    sellerName: '',
+    brandName: '',
   });
+
+  // Sample photo state — kept separate from sampleFormData because it holds a raw
+  // File object (not Firestore-serializable). Upload only happens on Save (see
+  // handleSubmitSample), never on select/preview.
+  const [sampleImageFile, setSampleImageFile] = useState<File | null>(null);
+  const [sampleImagePreview, setSampleImagePreview] = useState<string>('');
+  const [sampleImageRemoved, setSampleImageRemoved] = useState(false);
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+  const galleryInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (sampleImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(sampleImagePreview);
+      }
+    };
+  }, [sampleImagePreview]);
 
   // Output progress modal
   const [progressModalSample, setProgressModalSample] = useState<AffiliateSample | null>(null);
@@ -291,7 +316,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
         const matchName = s.productName?.toLowerCase().includes(q);
         const matchAcc = s.accountName?.toLowerCase().includes(q);
         const matchPic = s.employeeName?.toLowerCase().includes(q);
-        if (!matchName && !matchAcc && !matchPic) return false;
+        if (!matchName && !matchPic) return false;
       }
       return true;
     });
@@ -382,7 +407,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       productImage: '',
       commissionRate: 10,
       accountIds: accounts.length > 0 ? [accounts[0].id!] : [],
-      category: 'Skincare & Kecantikan',
+      category: isSharingEmployee ? 'Fashion Kaos' : 'Skincare & Kecantikan',
       scope: isEmployee ? (userProfile?.scope || 'SHARING') : (isInvestor ? 'SHARING' : 'PRIBADI'),
       status: 'AKTIF',
       notes: '',
@@ -399,7 +424,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       productImage: prod.productImage || '',
       commissionRate: prod.commissionRate || 10,
       accountIds: prod.accountIds || [],
-      category: prod.category || 'Skincare & Kecantikan',
+      category: prod.category || (isSharingEmployee ? 'Fashion Kaos' : 'Skincare & Kecantikan'),
       scope: prod.scope || 'PRIBADI',
       status: prod.status || 'AKTIF',
       notes: prod.notes || '',
@@ -413,6 +438,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     setEditingSample(null);
     const defaultAcc = accounts[0];
     const defaultEmp = employees[0];
+    // Sharing employees (e.g. Melinda, Desta) cannot pick their own PIC — always self-assigned.
+    const isSharingEmployee = isEmployee && userProfile?.scope === 'SHARING';
+    const selfEmployeeId = (employeeProfile as any)?.employeeId || employeeProfile?.id || '';
     setSampleFormData({
       productId: '',
       productName: '',
@@ -422,9 +450,10 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       purchaseDate: tanggalHariIni(),
       quantity: '',
       totalCost: '',
-      status: 'DIPESAN',
+      // Sample masuk ke database = sudah diterima di kantor, jadi status default DITERIMA.
+      status: 'DITERIMA',
       accountId: defaultAcc?.id || '',
-      employeeId: defaultEmp?.employeeId || defaultEmp?.id || '',
+      employeeId: isSharingEmployee ? selfEmployeeId : (defaultEmp?.employeeId || defaultEmp?.id || ''),
       targetContent: '',
       completedContent: 0,
       unitContent: 'VT',
@@ -432,7 +461,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       autoCreateExpense: true,
       autoCreateTask: true,
       notes: '',
+      sellerName: '',
+      brandName: '',
     });
+    setSampleImageFile(null);
+    setSampleImagePreview('');
+    setSampleImageRemoved(false);
     setIsSampleModalOpen(true);
   };
 
@@ -442,6 +476,8 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     const defaultAcc = accounts.find((a) => prod.accountIds?.includes(a.id!)) || accounts[0];
     const defaultEmp = employees[0];
     const price = Number(prod.productPrice) || 0;
+    const isSharingEmployee = isEmployee && userProfile?.scope === 'SHARING';
+    const selfEmployeeId = (employeeProfile as any)?.employeeId || employeeProfile?.id || '';
 
     setSampleFormData({
       productId: prod.id || prod.productId || '',
@@ -452,9 +488,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       purchaseDate: tanggalHariIni(),
       quantity: '',
       totalCost: price,
-      status: 'DIPESAN',
+      status: 'DITERIMA',
       accountId: defaultAcc?.id || '',
-      employeeId: defaultEmp?.employeeId || defaultEmp?.id || '',
+      employeeId: isSharingEmployee ? selfEmployeeId : (defaultEmp?.employeeId || defaultEmp?.id || ''),
       targetContent: '',
       completedContent: 0,
       unitContent: 'VT',
@@ -462,7 +498,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       autoCreateExpense: true,
       autoCreateTask: true,
       notes: `Pembelian sampel untuk ${prod.productName}`,
+      sellerName: '',
+      brandName: '',
     });
+    setSampleImageFile(null);
+    setSampleImagePreview('');
+    setSampleImageRemoved(false);
     setIsSampleModalOpen(true);
   };
 
@@ -487,7 +528,12 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       autoCreateExpense: false,
       autoCreateTask: false,
       notes: sample.notes || '',
+      sellerName: sample.sellerName || '',
+      brandName: sample.brandName || '',
     });
+    setSampleImageFile(null);
+    setSampleImagePreview(sample.sampleImage || '');
+    setSampleImageRemoved(false);
     setIsSampleModalOpen(true);
   };
 
@@ -562,15 +608,30 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       const selAcc = accounts.find((a) => a.id === sampleFormData.accountId);
       const selEmp = employees.find((e) => e.employeeId === sampleFormData.employeeId || e.id === sampleFormData.employeeId);
 
+      // Sample photo: upload ONLY here (on Save click), ONLY if the user picked a
+      // new file (camera or gallery) in this session. If editing and the photo
+      // wasn't touched, we don't include `sampleImage` in the payload at all, so
+      // updateDoc leaves the existing Storage URL untouched (no re-upload).
+      let sampleImageUrl: string | undefined = undefined;
+      if (sampleImageFile) {
+        const tempId = editingSample?.id || `temp_${Date.now()}`;
+        sampleImageUrl = await uploadSampleImage(sampleImageFile, tempId);
+      } else if (sampleImageRemoved) {
+        sampleImageUrl = '';
+      }
+
       const payload: any = {
         ...sampleFormData,
         accountName: selAcc?.accountName || '',
         employeeName: selEmp?.name || '',
       };
+      if (sampleImageUrl !== undefined) {
+        payload.sampleImage = sampleImageUrl;
+      }
 
       if (editingSample?.id) {
         await updateSample(editingSample.id, editingSample, payload, uid, name);
-        setSuccessToast(`Data sampel "${sampleFormData.productName}" berhasil diperbarui.`);
+        setSuccessToast('PRODUK SAMPEL BERHASIL DISIMPAN');
       } else {
         await createSample(
           payload,
@@ -579,11 +640,11 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
           uid,
           name
         );
-        setSuccessToast(`Sampel "${sampleFormData.productName}" berhasil dicatat.`);
+        setSuccessToast('PRODUK SAMPEL BERHASIL DISIMPAN');
       }
       setIsSampleModalOpen(false);
     } catch (err: any) {
-      setActionError(err.message || 'Gagal menyimpan data sampel');
+      setActionError(err.message || 'PRODUK SAMPEL GAGAL DISIMPAN');
     } finally {
       setSubmitting(false);
     }
@@ -1311,7 +1372,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                     onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
                     className="w-full rounded-xl border border-zinc-300 p-2.5 font-medium"
                   >
-                    {(isEmployee ? EMPLOYEE_KATEGORI_OPTIONS : MASTER_KATEGORI_OPTIONS).map((cat) => (
+                    {(isSharingEmployee ? EMPLOYEE_KATEGORI_OPTIONS : MASTER_KATEGORI_OPTIONS).map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>
@@ -1423,6 +1484,115 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1">Nama Seller *</label>
+                <input
+                  type="text"
+                  required
+                  value={sampleFormData.sellerName}
+                  onChange={(e) => setSampleFormData({ ...sampleFormData, sellerName: e.target.value })}
+                  placeholder="Nama toko / seller tempat sampel dibeli"
+                  className="w-full rounded-xl border border-zinc-300 p-2.5 text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1">Nama Brand *</label>
+                <input
+                  type="text"
+                  required
+                  value={sampleFormData.brandName}
+                  onChange={(e) => setSampleFormData({ ...sampleFormData, brandName: e.target.value })}
+                  placeholder="Nama brand produk sampel"
+                  className="w-full rounded-xl border border-zinc-300 p-2.5 text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1">Foto Sampel</label>
+
+                {/* Hidden inputs: camera (rear) & gallery. accept+capture only affects mobile;
+                    desktop browsers fall back to the normal file picker automatically. */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSampleImageFile(file);
+                      setSampleImagePreview(URL.createObjectURL(file));
+                      setSampleImageRemoved(false);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSampleImageFile(file);
+                      setSampleImagePreview(URL.createObjectURL(file));
+                      setSampleImageRemoved(false);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+
+                {sampleImagePreview ? (
+                  <div className="space-y-2">
+                    <img
+                      src={sampleImagePreview}
+                      alt="Preview foto sampel"
+                      className="w-full max-h-48 object-cover rounded-xl border border-zinc-300"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex-1 rounded-xl border border-zinc-300 p-2 text-xs font-bold text-zinc-700"
+                      >
+                        📷 Ambil Ulang
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSampleImageFile(null);
+                          setSampleImagePreview('');
+                          setSampleImageRemoved(true);
+                        }}
+                        className="flex-1 rounded-xl border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-600"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="rounded-xl border border-zinc-300 p-2.5 text-xs font-bold text-zinc-700"
+                    >
+                      📷 AMBIL FOTO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="rounded-xl border border-zinc-300 p-2.5 text-xs font-bold text-zinc-700"
+                    >
+                      🖼️ PILIH DARI GALERI
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className={`grid ${isEmployee ? 'grid-cols-1' : 'grid-cols-3'} gap-2.5`}>
                 {!isEmployee && (
                   <div>
@@ -1491,61 +1661,49 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-zinc-700 mb-1">Akun TikTok / Medsos</label>
-                  <select
-                    value={sampleFormData.accountId}
-                    onChange={(e) => {
-                      const acc = accounts.find((a) => a.id === e.target.value);
-                      setSampleFormData({
-                        ...sampleFormData,
-                        accountId: e.target.value,
-                        scope: acc?.scope || sampleFormData.scope,
-                      });
-                    }}
-                    className="w-full rounded-xl border border-zinc-300 p-2 font-medium"
-                  >
-                    <option value="">-- Pilih Akun --</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.accountName} ({a.scope})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-zinc-700 mb-1">PIC (Penanggung Jawab Konten)</label>
-                  <select
-                    value={sampleFormData.employeeId}
-                    onChange={(e) => setSampleFormData({ ...sampleFormData, employeeId: e.target.value })}
-                    className="w-full rounded-xl border border-zinc-300 p-2 font-medium"
-                  >
-                    <option value="">-- Pilih Karyawan --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.employeeId || emp.id} value={emp.employeeId || emp.id}>
-                        {emp.name} ({emp.position})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1">Akun TikTok / Medsos</label>
+                <select
+                  value={sampleFormData.accountId}
+                  onChange={(e) => {
+                    const acc = accounts.find((a) => a.id === e.target.value);
+                    setSampleFormData({
+                      ...sampleFormData,
+                      accountId: e.target.value,
+                      scope: acc?.scope || sampleFormData.scope,
+                    });
+                  }}
+                  className="w-full rounded-xl border border-zinc-300 p-2 font-medium"
+                >
+                  <option value="">-- Pilih Akun --</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.accountName} ({a.scope})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className={`grid ${isEmployee ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">Status Sampel</label>
-                  <select
-                    value={sampleFormData.status}
-                    onChange={(e) => setSampleFormData({ ...sampleFormData, status: e.target.value as SampleStatus })}
-                    className="w-full rounded-xl border border-zinc-300 p-2 font-bold"
-                  >
-                    {STATUS_FLOW.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
+                  {editingSample ? (
+                    <select
+                      value={sampleFormData.status}
+                      onChange={(e) => setSampleFormData({ ...sampleFormData, status: e.target.value as SampleStatus })}
+                      className="w-full rounded-xl border border-zinc-300 p-2 font-bold"
+                    >
+                      {STATUS_FLOW.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-2 font-bold text-emerald-700">
+                      DITERIMA (Sampel sudah di kantor)
+                    </div>
+                  )}
                 </div>
 
                 {!isEmployee && (
@@ -1611,7 +1769,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                   disabled={submitting}
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 font-black shadow-md cursor-pointer"
                 >
-                  {submitting ? 'Menyimpan...' : 'SIMPAN SAMPEL'}
+                  {submitting ? 'MENYIMPAN SAMPEL...' : 'SIMPAN SAMPEL'}
                 </button>
               </div>
             </form>
@@ -1709,9 +1867,24 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
+              {detailSample.sampleImage && (
+                <img
+                  src={detailSample.sampleImage}
+                  alt="Foto sampel"
+                  className="w-full max-h-48 object-cover rounded-xl border border-zinc-200 mb-1"
+                />
+              )}
               <div className="flex justify-between border-b border-zinc-100 pb-2">
                 <span className="text-zinc-500">Nama Produk:</span>
                 <strong className="text-zinc-900 font-bold">{detailSample.productName}</strong>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 pb-2">
+                <span className="text-zinc-500">Nama Brand:</span>
+                <span className="font-semibold text-zinc-800">{detailSample.brandName || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 pb-2">
+                <span className="text-zinc-500">Nama Seller:</span>
+                <span className="font-semibold text-zinc-800">{detailSample.sellerName || '-'}</span>
               </div>
               <div className="flex justify-between border-b border-zinc-100 pb-2">
                 <span className="text-zinc-500">Status:</span>

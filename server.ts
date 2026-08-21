@@ -177,67 +177,6 @@ async function startServer() {
     res.json({ clientIp, isAllowed, allowedOfficeIps: allowedIps });
   });
 
-  // =========================================================================
-  // API: NETWORK VERIFICATION FOR ROLE ACCESS CONTROL (IPv4 + IPv6)
-  // =========================================================================
-  app.post('/api/auth/verify-network', (req, res) => {
-    try {
-      const { uid, role } = req.body || {};
-      const normalizedRole = String(role || '').toUpperCase();
-      const requestPublicIp = extractClientIp(req);
-      const allowedOfficeIps = getAllowedOfficeIps();
-
-      const matchedWhitelist = allowedOfficeIps.some((officeIp) =>
-        ipMatches(requestPublicIp, officeIp)
-      );
-
-      let allowed = false;
-
-      // 1. OWNER and INVESTOR can login from anywhere
-      if (normalizedRole === 'OWNER' || normalizedRole === 'INVESTOR') {
-        allowed = true;
-      }
-      // 2. EMPLOYEE & MANAGER must originate from office public IP (IPv4 or IPv6)
-      else if (normalizedRole === 'EMPLOYEE' || normalizedRole === 'MANAGER') {
-        allowed = matchedWhitelist;
-      }
-      // 3. Fallback for undefined/unknown roles: require office network
-      else {
-        allowed = matchedWhitelist;
-      }
-
-      // Diagnostic logging
-      console.log('[LOGIN_NETWORK_CHECK]', {
-        role: normalizedRole,
-        requestPublicIp: requestPublicIp || 'unknown',
-        matchedWhitelist: matchedWhitelist,
-        allowed: allowed,
-      });
-
-      if (!allowed) {
-        return res.status(403).json({
-          allowed: false,
-          clientIp: requestPublicIp,
-          code: 'OFFICE_NETWORK_REQUIRED',
-          message: `Login karyawan hanya dapat dilakukan melalui jaringan kantor PT.KDRT. (IP terdeteksi: ${requestPublicIp || 'Tidak terdeteksi'})`,
-        });
-      }
-
-      return res.json({
-        allowed: true,
-        clientIp: requestPublicIp,
-        message: 'Network access granted.',
-      });
-    } catch (err: any) {
-      console.error('Error in /api/auth/verify-network:', err);
-      return res.status(500).json({
-        allowed: false,
-        code: 'NETWORK_VERIFICATION_ERROR',
-        message: 'Gagal memverifikasi jaringan.',
-      });
-    }
-  });
-
   // Lazy initialize Gemini client
   let aiClient: GoogleGenAI | null = null;
   function getGeminiClient(): GoogleGenAI {

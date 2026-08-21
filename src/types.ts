@@ -671,7 +671,10 @@ export interface AffiliateSample {
   scope: ScopeType; // 'PRIBADI' | 'SHARING'
   category?: string;
   notes?: string;
-  
+  sellerName?: string; // Nama Seller/Toko tempat sampel dibeli
+  brandName?: string; // Nama Brand produk sampel
+  sampleImage?: string; // Foto kondisi fisik sampel (BEDA dari productImage / foto produk master)
+
   createdBy: string;
   createdByName?: string;
   createdAt?: any;
@@ -1256,4 +1259,3 @@ export interface FinancialAdjustment {
   approvedByName: string;
   createdAt?: any;
 }
-
