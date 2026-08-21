@@ -24,6 +24,7 @@ import { ProfitSharingPage } from './pages/ProfitSharingPage';
 import { InvestorDashboardPage } from './pages/InvestorDashboardPage';
 import { SampelInventoryPage } from './pages/SampelInventoryPage';
 import { DatabaseSampelPage } from './pages/DatabaseSampelPage';
+import { PenataanLokasiPage } from './pages/PenataanLokasiPage';
 import { ProdukPage } from './pages/ProdukPage';
 import { SampelPage } from './pages/SampelPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -33,6 +34,7 @@ import { ExportCenterPage } from './pages/ExportCenterPage';
 import { TutupBulanPage } from './pages/TutupBulanPage';
 import { KerjaanHarianPage } from './pages/KerjaanHarianPage';
 import { ProfilSayaPage } from './pages/ProfilSayaPage';
+import { InputManualOwnerPage } from './pages/InputManualOwnerPage';
 import { LoginPage } from './pages/LoginPage';
 import { Lock } from 'lucide-react';
 
@@ -94,6 +96,8 @@ const MainLayout: React.FC = () => {
         'profil-saya',
         'kerjaan-harian',
         'database-sampel',
+        'penataan-lokasi',
+        'lokasi-sampel',
         'produk',
         'sampel',
         'sampel-inventory'
@@ -180,6 +184,19 @@ const MainLayout: React.FC = () => {
           );
         }
         return <InputKomisiRealPage onBackToPortal={handleBackToPortal} />;
+      case 'input-manual':
+        if (role !== 'OWNER') {
+          return (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900">
+              <Lock className="mx-auto h-10 w-10 text-rose-600 mb-2" />
+              <h3 className="font-bold text-base">Akses Dibatasi</h3>
+              <p className="text-xs text-rose-700 mt-1">
+                Menu Input Manual hanya dapat diakses oleh Akun Owner PT.KDRT.
+              </p>
+            </div>
+          );
+        }
+        return <InputManualOwnerPage onBackToPortal={handleBackToPortal} />;
       case 'dashboard-sharing':
       case 'keuangan-sharing':
         return role === 'INVESTOR' ? (
@@ -225,6 +242,9 @@ const MainLayout: React.FC = () => {
       // 4. Products, Sample, Tasks, Schedule & Reports
       case 'database-sampel':
         return <DatabaseSampelPage onBackToPortal={handleBackToPortal} />;
+      case 'penataan-lokasi':
+      case 'lokasi-sampel':
+        return <PenataanLokasiPage onBackToPortal={handleBackToPortal} />;
       case 'produk':
         return <DatabaseSampelPage onBackToPortal={handleBackToPortal} initialTab="PRODUK" />;
       case 'sampel':

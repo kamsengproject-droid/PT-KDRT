@@ -262,7 +262,19 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 15. AUDIT LOGS
+    // 15. INPUT MANUAL (KOMISI MINGGUAN & KOMISI EMPLOYEE)
+    // ==========================================
+    match /weeklyCommissions/{commissionId} {
+      allow read, write: if isOwner();
+    }
+
+    match /employeeCommissions/{empCommId} {
+      allow read: if isOwner() || isManager() || (isAuthenticated() && resource.data.get('employeeId', '') == request.auth.uid);
+      allow write: if isOwner();
+    }
+
+    // ==========================================
+    // 16. AUDIT LOGS
     // ==========================================
     match /auditLogs/{auditId} {
       allow read: if isOwner() || isManager();

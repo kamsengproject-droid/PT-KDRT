@@ -109,7 +109,7 @@ export async function uploadSelfieStorage(
 export interface AbsenMasukParams {
   employeeId: string;
   employeeName: string;
-  fotoBase64: string;
+  fotoBase64?: string;
   latitude?: number;
   longitude?: number;
   accuracy?: number;
@@ -127,7 +127,6 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
   const {
     employeeId,
     employeeName,
-    fotoBase64,
     latitude,
     longitude,
     accuracy,
@@ -138,7 +137,11 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     currentUserId,
     currentUserName,
     customTimeStr,
+    onProgress,
   } = params;
+
+  console.time('[ATTENDANCE_SAVE_TOTAL]');
+  console.log('[ATTENDANCE_SAVE_START]', { type: 'CHECKIN', employeeId, employeeName });
 
   const today = tanggalHariIni();
   const dateFormatted = today.replace(/-/g, '');
@@ -146,17 +149,20 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
   const docRef = doc(db, 'attendance', docId);
 
   // 1. Check existing record (prevent duplicate check-in)
+  console.time('[ATTENDANCE_DUPLICATE_CHECK]');
   const existingSnap = await getDoc(docRef);
+  console.timeEnd('[ATTENDANCE_DUPLICATE_CHECK]');
+
   if (existingSnap.exists()) {
     const data = existingSnap.data();
     if (data.waktuMasuk || data.checkInTime || data.checkInAt) {
-      await catatAuditLog(
+      catatAuditLog(
         currentUserId,
         currentUserName,
         'CHECK_IN_REJECTED',
         employeeName,
         'Alasan: DUPLICATE_CHECK_IN (Anda sudah melakukan absen masuk hari ini.)'
-      );
+      ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
       throw new Error('Anda sudah melakukan absen masuk hari ini.');
     }
   }
@@ -167,13 +173,13 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
   if (validateGps && latitude !== undefined && longitude !== undefined && accuracy !== undefined) {
     const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
     if (accuracy > accuracyLimit) {
-      await catatAuditLog(
+      catatAuditLog(
         currentUserId,
         currentUserName,
         'CHECK_IN_REJECTED',
         employeeName,
         `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
-      );
+      ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
       throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
     }
 
@@ -187,13 +193,13 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     );
 
     if (!geofenceResult.isWithin) {
-      await catatAuditLog(
+      catatAuditLog(
         currentUserId,
         currentUserName,
         'CHECK_IN_REJECTED',
         employeeName,
         `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
-      );
+      ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
       throw new Error('Anda berada di luar area kantor.');
     }
     distanceMeters = geofenceResult.distance;
@@ -217,12 +223,9 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     menitTerlambat = calc.menitTerlambat;
   }
 
-  // 4. Upload photo to Firebase Storage
-  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkin', fotoBase64, params.onProgress);
+  if (onProgress) onProgress('Menyimpan absensi...');
 
-  if (params.onProgress) params.onProgress('Menyimpan absensi...');
-
-  // 5. Save attendance record to Firestore with serverTimestamp
+  // 4. Save attendance record to Firestore with serverTimestamp (instant without selfie upload)
   const recordData: any = {
     userId: currentUserId,
     employeeId,
@@ -234,15 +237,6 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
     checkInAt: serverTimestamp(),
     checkInTime: timeStr,
     waktuMasuk: timeStr,
-    checkInPhotoUrl: uploadRes.photoUrl,
-    fotoMasuk: uploadRes.photoUrl,
-    checkInStoragePath: uploadRes.storagePath,
-
-    // Photo metadata
-    photoWidth: uploadRes.photoWidth,
-    photoHeight: uploadRes.photoHeight,
-    photoSizeBytes: uploadRes.photoSizeBytes,
-    photoMimeType: uploadRes.photoMimeType,
 
     // Status
     status,
@@ -263,15 +257,21 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
   if (distanceMeters > 0) recordData.distanceFromOffice = distanceMeters;
 
   try {
+    console.time('[ATTENDANCE_FIRESTORE_WRITE]');
     await setDoc(docRef, recordData, { merge: true });
+    console.timeEnd('[ATTENDANCE_FIRESTORE_WRITE]');
 
-    await catatAuditLog(
+    console.log('[ATTENDANCE_SAVE_END]', { docId });
+    console.timeEnd('[ATTENDANCE_SAVE_TOTAL]');
+
+    // Non-blocking audit log so user doesn't wait for audit trail
+    catatAuditLog(
       currentUserId,
       currentUserName,
       'CHECK_IN_SUCCESS',
       employeeName,
       `Absen Masuk: ${timeStr} WIB (${daySched.namaHari}, Jadwal: ${daySched.checkInTime} WIB), Status: ${status}${menitTerlambat > 0 ? ` (Terlambat ${menitTerlambat} menit)` : ''}`
-    );
+    ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
 
     return { id: docId, ...recordData };
   } catch (err) {
@@ -284,7 +284,7 @@ export async function lakukanAbsenMasuk(params: AbsenMasukParams): Promise<Atten
 export interface AbsenPulangParams {
   employeeId: string;
   employeeName: string;
-  fotoBase64: string;
+  fotoBase64?: string;
   latitude?: number;
   longitude?: number;
   accuracy?: number;
@@ -301,7 +301,6 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
   const {
     employeeId,
     employeeName,
-    fotoBase64,
     latitude,
     longitude,
     accuracy,
@@ -314,33 +313,39 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     onProgress,
   } = params;
 
+  console.time('[ATTENDANCE_SAVE_TOTAL]');
+  console.log('[ATTENDANCE_SAVE_START]', { type: 'CHECKOUT', employeeId, employeeName });
+
   const today = tanggalHariIni();
   const dateFormatted = today.replace(/-/g, '');
   const docId = `${employeeId}_${dateFormatted}`;
   const docRef = doc(db, 'attendance', docId);
 
   // 1. Check existing record
+  console.time('[ATTENDANCE_DUPLICATE_CHECK]');
   const existingSnap = await getDoc(docRef);
+  console.timeEnd('[ATTENDANCE_DUPLICATE_CHECK]');
+
   if (!existingSnap.exists() || (!existingSnap.data().waktuMasuk && !existingSnap.data().checkInTime)) {
-    await catatAuditLog(
+    catatAuditLog(
       currentUserId,
       currentUserName,
       'CHECK_OUT_REJECTED',
       employeeName,
       'Alasan: CHECKOUT_WITHOUT_CHECKIN (Anda belum melakukan absen masuk hari ini.)'
-    );
+    ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
     throw new Error('Anda belum melakukan absen masuk hari ini.');
   }
 
   const existingData = existingSnap.data();
   if (existingData.waktuPulang || existingData.checkOutTime || existingData.checkOutAt) {
-    await catatAuditLog(
+    catatAuditLog(
       currentUserId,
       currentUserName,
       'CHECK_OUT_REJECTED',
       employeeName,
       'Alasan: DUPLICATE_CHECK_OUT (Anda sudah melakukan absen pulang hari ini.)'
-    );
+    ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
     throw new Error('Anda sudah melakukan absen pulang hari ini.');
   }
 
@@ -350,13 +355,13 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
   if (validateGps && latitude !== undefined && longitude !== undefined && accuracy !== undefined) {
     const accuracyLimit = office.radius ? Math.max(office.radius, 100) : 100;
     if (accuracy > accuracyLimit) {
-      await catatAuditLog(
+      catatAuditLog(
         currentUserId,
         currentUserName,
         'CHECK_OUT_REJECTED',
         employeeName,
         `Alasan: LOW_GPS_ACCURACY (Akurasi ${Math.round(accuracy)}m > batas ${accuracyLimit}m)`
-      );
+      ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
       throw new Error('Akurasi lokasi terlalu rendah. Silakan aktifkan lokasi dengan akurasi tinggi dan coba lagi.');
     }
 
@@ -370,13 +375,13 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     );
 
     if (!geofenceResult.isWithin) {
-      await catatAuditLog(
+      catatAuditLog(
         currentUserId,
         currentUserName,
         'CHECK_OUT_REJECTED',
         employeeName,
         `Alasan: OUTSIDE_GEOFENCE (Jarak: ${geofenceResult.distance}m dari radius ${office.radius}m)`
-      );
+      ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
       throw new Error('Anda berada di luar area kantor.');
     }
     distanceMeters = geofenceResult.distance;
@@ -392,18 +397,12 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
     daySched.earlyCheckoutToleranceMinutes
   );
 
-  // 4. Upload photo to Firebase Storage
-  const uploadRes = await uploadSelfieStorage(employeeId, today, 'checkout', fotoBase64, onProgress);
-
   if (onProgress) onProgress('Menyimpan absensi...');
 
   const updateData: any = {
     checkOutAt: serverTimestamp(),
     checkOutTime: timeStr,
     waktuPulang: timeStr,
-    checkOutPhotoUrl: uploadRes.photoUrl,
-    fotoPulang: uploadRes.photoUrl,
-    checkOutStoragePath: uploadRes.storagePath,
     statusPulang: checkoutCalc.statusPulang,
     checkoutStatus: checkoutCalc.checkoutStatus,
     isEarlyCheckout: checkoutCalc.isEarlyCheckout,
@@ -418,19 +417,25 @@ export async function lakukanAbsenPulang(params: AbsenPulangParams): Promise<Att
   if (distanceMeters > 0) updateData.distanceFromOffice = distanceMeters;
 
   try {
+    console.time('[ATTENDANCE_FIRESTORE_WRITE]');
     await updateDoc(docRef, updateData);
+    console.timeEnd('[ATTENDANCE_FIRESTORE_WRITE]');
+
+    console.log('[ATTENDANCE_SAVE_END]', { docId });
+    console.timeEnd('[ATTENDANCE_SAVE_TOTAL]');
 
     const logDetail = checkoutCalc.isEarlyCheckout
       ? `PULANG TERLALU CEPAT (${checkoutCalc.earlyCheckoutMinutes} menit sebelum batas ${checkoutCalc.earliestAllowedTime} WIB, Jadwal: ${daySched.checkOutTime}) [EARLY_CHECKOUT]`
       : `NORMAL / TEPAT WAKTU (Batas mulai: ${checkoutCalc.earliestAllowedTime} WIB, Jadwal: ${daySched.checkOutTime} WIB)`;
 
-    await catatAuditLog(
+    // Non-blocking audit log
+    catatAuditLog(
       currentUserId,
       currentUserName,
       'CHECK_OUT_SUCCESS',
       employeeName,
       `Absen Pulang: ${timeStr} WIB (${daySched.namaHari}), Status: ${logDetail}${distanceMeters > 0 ? `, Jarak: ${distanceMeters}m` : ''}`
-    );
+    ).catch((e) => console.warn('[AUDIT_LOG_ERROR]', e));
 
     return { id: docId, ...existingData, ...updateData } as AttendanceRecord;
   } catch (err) {

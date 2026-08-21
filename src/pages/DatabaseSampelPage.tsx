@@ -37,6 +37,7 @@ import {
   SlidersHorizontal,
   Camera,
   Sparkles,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProductScanModal } from '../components/sample/ProductScanModal';
@@ -50,6 +51,7 @@ import {
   Employee,
   ScopeType,
   ProductStatus,
+  SampleLocation,
 } from '../types';
 import {
   subscribeSamples,
@@ -68,6 +70,7 @@ import {
 } from '../services/productService';
 import { subscribeAccounts } from '../services/accountService';
 import { subscribeEmployees } from '../services/employeeService';
+import { subscribeSampleLocations } from '../services/sampleLocationService';
 import { formatRupiah, formatTanggal, tanggalHariIni, exportToCSV } from '../utils/formatters';
 
 interface DatabaseSampelPageProps {
@@ -117,11 +120,13 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [locations, setLocations] = useState<SampleLocation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [scopeFilter, setScopeFilter] = useState<'SEMUA' | ScopeType>(isInvestor ? 'SHARING' : 'SEMUA');
+  const [locationFilter, setLocationFilter] = useState<string>('SEMUA');
   const [activeTab, setActiveTab] = useState<'SAMPEL' | 'MASTER_PRODUK'>(
     initialTab === 'PRODUK' || initialTab === 'MASTER_PRODUK' ? 'MASTER_PRODUK' : 'SAMPEL'
   );
@@ -187,6 +192,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     notes: string;
     sellerName: string;
     brandName: string;
+    locationId?: string;
+    locationCode?: string;
+    locationName?: string;
   }>({
     productId: '',
     productName: '',
@@ -208,6 +216,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
     notes: '',
     sellerName: '',
     brandName: '',
+    locationId: '',
+    locationCode: '',
+    locationName: '',
   });
 
   // Sample photo state — kept separate from sampleFormData because it holds a raw
@@ -279,11 +290,16 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       setEmployees(empList.filter((e) => e.active));
     });
 
+    const unsubLocations = subscribeSampleLocations((locList) => {
+      setLocations(locList.filter((l) => l.aktif !== false));
+    });
+
     return () => {
       unsubProducts();
       unsubSamples();
       unsubAccounts();
       unsubEmployees();
+      unsubLocations();
     };
   }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active, isInvestor]);
 
@@ -311,16 +327,25 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       if (isInvestor && s.scope !== 'SHARING') return false;
       if (scopeFilter !== 'SEMUA' && s.scope !== scopeFilter) return false;
 
+      // Location filter
+      if (locationFilter === 'BELUM_DITATA') {
+        if (s.locationId || s.locationCode) return false;
+      } else if (locationFilter !== 'SEMUA') {
+        if (s.locationId !== locationFilter && s.locationCode !== locationFilter) return false;
+      }
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = s.productName?.toLowerCase().includes(q);
         const matchAcc = s.accountName?.toLowerCase().includes(q);
         const matchPic = s.employeeName?.toLowerCase().includes(q);
-        if (!matchName && !matchPic) return false;
+        const matchBrand = s.brandName?.toLowerCase().includes(q);
+        const matchLoc = s.locationCode?.toLowerCase().includes(q) || s.locationName?.toLowerCase().includes(q);
+        if (!matchName && !matchPic && !matchBrand && !matchLoc) return false;
       }
       return true;
     });
-  }, [samples, scopeFilter, searchQuery, isInvestor]);
+  }, [samples, scopeFilter, locationFilter, searchQuery, isInvestor]);
 
   // Dashboard Metrics (Sampel Baru, Sampel Dikirim, Sampel Diterima, Sampel Belum Dibuat Konten, & Total Belanja)
   const metrics = useMemo(() => {
@@ -463,6 +488,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       notes: '',
       sellerName: '',
       brandName: '',
+      locationId: '',
+      locationCode: '',
+      locationName: '',
     });
     setSampleImageFile(null);
     setSampleImagePreview('');
@@ -500,6 +528,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       notes: `Pembelian sampel untuk ${prod.productName}`,
       sellerName: '',
       brandName: '',
+      locationId: '',
+      locationCode: '',
+      locationName: '',
     });
     setSampleImageFile(null);
     setSampleImagePreview('');
@@ -530,6 +561,9 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
       notes: sample.notes || '',
       sellerName: sample.sellerName || '',
       brandName: sample.brandName || '',
+      locationId: sample.locationId || '',
+      locationCode: sample.locationCode || '',
+      locationName: sample.locationName || '',
     });
     setSampleImageFile(null);
     setSampleImagePreview(sample.sampleImage || '');
@@ -883,6 +917,25 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
             </div>
           )}
 
+          {activeTab === 'SAMPEL' && locations.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-xl px-2.5 py-1 text-xs shadow-2xs">
+              <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold text-zinc-700 focus:outline-hidden cursor-pointer"
+              >
+                <option value="SEMUA">Semua Lokasi</option>
+                <option value="BELUM_DITATA">⚠️ Belum Ditata</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.kodeLokasi}>
+                    📍 {loc.kodeLokasi} ({loc.namaLokasi})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="relative min-w-[200px] flex-1 sm:flex-initial">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
             <input
@@ -954,6 +1007,17 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                               <span>{sample.accountName || 'Akun -'}</span>
                               <span>•</span>
                               <span className="font-semibold text-zinc-700">PIC: {sample.employeeName || '-'}</span>
+                              <span>•</span>
+                              {sample.locationCode ? (
+                                <span className="inline-flex items-center gap-0.5 rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                                  <MapPin className="h-3 w-3" />
+                                  {sample.locationCode}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                                  Belum Ditata
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1009,23 +1073,29 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
 
                       {/* Action buttons */}
                       <div className="flex items-center justify-between pt-1 border-t border-zinc-100 text-xs">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setProgressModalSample(sample);
-                              setNewCompletedCount(sample.completedContent || 0);
-                            }}
-                            className="rounded-lg bg-orange-50 border border-orange-200 px-2.5 py-1 text-[11px] font-bold text-orange-700 hover:bg-orange-100 transition-colors"
-                          >
-                            + Update VT
-                          </button>
-                          <button
-                            onClick={() => setStatusModalSample(sample)}
-                            className="rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-200 transition-colors"
-                          >
-                            Status
-                          </button>
-                        </div>
+                        {!isInvestor ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setProgressModalSample(sample);
+                                setNewCompletedCount(sample.completedContent || 0);
+                              }}
+                              className="rounded-lg bg-orange-50 border border-orange-200 px-2.5 py-1 text-[11px] font-bold text-orange-700 hover:bg-orange-100 transition-colors"
+                            >
+                              + Update VT
+                            </button>
+                            <button
+                              onClick={() => setStatusModalSample(sample)}
+                              className="rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-200 transition-colors"
+                            >
+                              Status
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] font-medium text-zinc-400">
+                            Mode Investor (Hanya Lihat)
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-1.5">
                           <button
@@ -1109,6 +1179,17 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                             <span>{sample.accountName || 'Akun -'}</span>
                             <span>•</span>
                             <span>PIC: {sample.employeeName || '-'}</span>
+                            <span>•</span>
+                            {sample.locationCode ? (
+                              <span className="inline-flex items-center gap-0.5 rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                                <MapPin className="h-3 w-3" />
+                                {sample.locationCode}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 rounded-md bg-zinc-200 px-1.5 py-0.5 text-[9px] font-bold text-zinc-600">
+                                Belum Ditata
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1239,13 +1320,19 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
 
                   {/* Footer & Action: [ + BELI SAMPEL ] */}
                   <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => handleOpenBuySample(prod)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-3 text-xs font-black shadow-2xs transition-colors cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>+ BELI SAMPEL</span>
-                    </button>
+                    {!isInvestor ? (
+                      <button
+                        onClick={() => handleOpenBuySample(prod)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-3 text-xs font-black shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ BELI SAMPEL</span>
+                      </button>
+                    ) : (
+                      <span className="flex-1 text-[11px] font-semibold text-zinc-400">
+                        Katalog Produk Sharing
+                      </span>
+                    )}
 
                     <button
                       onClick={() => setDetailProduct(prod)}
@@ -1684,6 +1771,34 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
                 </select>
               </div>
 
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1">📍 Lokasi Rak / Hanger</label>
+                <select
+                  value={sampleFormData.locationId || ''}
+                  onChange={(e) => {
+                    const locId = e.target.value;
+                    const selected = locations.find((l) => l.id === locId);
+                    setSampleFormData({
+                      ...sampleFormData,
+                      locationId: locId,
+                      locationCode: selected?.kodeLokasi || '',
+                      locationName: selected?.namaLokasi || '',
+                    });
+                  }}
+                  className="w-full rounded-xl border border-zinc-300 p-2 font-semibold text-zinc-800"
+                >
+                  <option value="">-- Pilih Lokasi Fisik (Opsional) --</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      📍 {loc.kodeLokasi} — {loc.namaLokasi} ({loc.tipeLokasi} / {loc.kategori})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Atur posisi rak / gantungan fisik sampel di studio live atau kantor.
+                </p>
+              </div>
+
               <div className={`grid ${isEmployee ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">Status Sampel</label>
@@ -1901,6 +2016,19 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
               <div className="flex justify-between border-b border-zinc-100 pb-2">
                 <span className="text-zinc-500">PIC:</span>
                 <span className="font-semibold text-zinc-800">{detailSample.employeeName || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 pb-2">
+                <span className="text-zinc-500">Lokasi Fisik:</span>
+                {detailSample.locationCode ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                    <MapPin className="h-3 w-3" />
+                    {detailSample.locationCode} {detailSample.locationName ? `— ${detailSample.locationName}` : ''}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                    Belum Ditata
+                  </span>
+                )}
               </div>
               {!isEmployee && (
                 <div className="flex justify-between border-b border-zinc-100 pb-2">

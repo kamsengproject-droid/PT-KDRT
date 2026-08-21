@@ -123,6 +123,7 @@ export type TransactionType = 'INCOME' | 'EXPENSE' | 'OPENING_BALANCE';
 export type TransactionStatus = 'ACTIVE' | 'VOID';
 export type TransactionSourceType =
   | 'TIKTOK_COMMISSION'
+  | 'WEEKLY_COMMISSION'
   | 'ENDORSE'
   | 'SPONSOR'
   | 'SERVICE'
@@ -675,6 +676,11 @@ export interface AffiliateSample {
   brandName?: string; // Nama Brand produk sampel
   sampleImage?: string; // Foto kondisi fisik sampel (BEDA dari productImage / foto produk master)
 
+  // Penataan Lokasi Fisik Sampel (Rak / Hanger / Lemari)
+  locationId?: string;
+  locationCode?: string; // e.g. "CELANA-A", "BATIK-A"
+  locationName?: string; // e.g. "Rak Celana A", "Hanger Batik A"
+
   createdBy: string;
   createdByName?: string;
   createdAt?: any;
@@ -685,6 +691,26 @@ export interface AffiliateSample {
 
 // Backward compatibility alias
 export type Sample = AffiliateSample;
+
+export type SampleLocationType = 'RAK' | 'HANGER' | 'KOTAK' | 'LEMARI' | 'LAINNYA';
+
+export interface SampleLocation {
+  id?: string;
+  locationId?: string;
+  kodeLokasi: string; // e.g. "CELANA-A", "BATIK-A" (Unique identifier)
+  namaLokasi: string; // e.g. "Rak Celana A", "Hanger Batik A"
+  kategori: string;   // e.g. "Fashion Celana", "Fashion Batik", "Fashion Kaos", "Fashion Setelan", etc.
+  tipeLokasi: SampleLocationType | string; // "RAK" | "HANGER" | "KOTAK" | "LEMARI" | "LAINNYA"
+  aktif: boolean;
+  active?: boolean;
+  notes?: string;
+  createdAt?: any;
+  createdBy?: string;
+  createdByName?: string;
+  updatedAt?: any;
+  updatedBy?: string;
+  updatedByName?: string;
+}
 
 // ==========================================
 // PHASE 3C: INVENTORY & ASET KANTOR
@@ -1259,3 +1285,48 @@ export interface FinancialAdjustment {
   approvedByName: string;
   createdAt?: any;
 }
+
+// ============================================================================
+// PHASE 7: INPUT MANUAL OWNER (KOMISI MINGGUAN & KOMISI EMPLOYEE)
+// ============================================================================
+
+export interface WeeklyCommission {
+  id?: string;
+  periodWeek: string; // e.g. "Minggu 3 (17 - 23 Agu 2026)"
+  accountName: string; // Nama akun / seller
+  sellerName?: string;
+  accountId?: string;
+  amount: number; // Nominal komisi (Rp)
+  date: string; // Tanggal input (YYYY-MM-DD)
+  notes?: string;
+  transactionId?: string; // Linked into master transactions collection
+  createdBy: string;
+  createdByName?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  updatedBy?: string;
+  updatedByName?: string;
+}
+
+export interface EmployeeCommission {
+  id?: string;
+  employeeId: string;
+  employeeName: string;
+  period: string; // e.g. "2026-08" or "Agustus 2026"
+  amount: number; // Nominal komisi (Rp)
+  basis: string; // Dasar/Periode Komisi (e.g. "Target VT Tercapai", "Bonus Live 50 Jam")
+  notes?: string;
+  status: 'BELUM DIBAYAR' | 'SUDAH DIBAYAR';
+  paymentDate?: string;
+  paidAt?: any;
+  paidBy?: string;
+  paidByName?: string;
+  expenseId?: string;
+  createdBy: string;
+  createdByName?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  updatedBy?: string;
+  updatedByName?: string;
+}
+

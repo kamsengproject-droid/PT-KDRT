@@ -23,6 +23,8 @@ import {
   X,
   Home,
   LogOut,
+  MapPin,
+  Edit3,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -79,11 +81,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 label: 'Kerjaan Hari Ini',
                 icon: ClipboardList,
               },
-              ...(employeeProfile?.permissions?.canViewSampleProducts !== false ? [{
-                id: 'database-sampel',
-                label: 'Produk Sampel',
-                icon: Package,
-              }] : []),
+              ...(employeeProfile?.permissions?.canViewSampleProducts !== false ? [
+                {
+                  id: 'database-sampel',
+                  label: 'Produk Sampel',
+                  icon: Package,
+                },
+                {
+                  id: 'penataan-lokasi',
+                  label: 'Penataan Lokasi',
+                  icon: MapPin,
+                },
+              ] : []),
               ...(employeeProfile?.permissions?.canViewOmset ? [{
                 id: 'performa-harian',
                 label: 'Data Omset',
@@ -163,6 +172,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 icon: Package,
               },
               {
+                id: 'penataan-lokasi',
+                label: 'Penataan Lokasi',
+                icon: MapPin,
+              },
+              {
                 id: 'inventory',
                 label: 'Inventaris & Aset',
                 icon: Boxes,
@@ -218,6 +232,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               },
             ],
           },
+          ...(isOwner
+            ? [
+                {
+                  section: 'INPUT MANUAL',
+                  items: [
+                    {
+                      id: 'input-manual',
+                      label: 'Input Manual Owner',
+                      icon: Edit3,
+                    },
+                  ],
+                },
+              ]
+            : []),
           ...(isOwner
             ? [
                 {

@@ -19,7 +19,7 @@ import { subscribeTransactions } from '../services/transactionService';
 import { FinancialTransaction, DailyPerformance, Expense, AttendanceRecord, Employee } from '../types';
 import { subscribeTodayAttendance } from '../services/attendanceService';
 import { subscribeEmployees } from '../services/employeeService';
-import { formatBulanTahun, formatRupiah, formatTanggal, tanggalHariIni, bulanHariIni } from '../utils/formatters';
+import { formatBulanTahun, formatRupiah, formatTanggal, tanggalHariIni, tanggalKemarin, bulanHariIni } from '../utils/formatters';
 
 export const DashboardSharingPage: React.FC = () => {
   const { role, userProfile, loading: authLoading, currentUser } = useAuth();
@@ -51,8 +51,20 @@ export const DashboardSharingPage: React.FC = () => {
     };
   }, [authLoading, currentUser?.uid, userProfile?.role, userProfile?.active]);
 
+  const todayStr = tanggalHariIni();
+  const yesterdayStr = tanggalKemarin();
+
   const filteredPerf = performance.filter((p) => p.date.startsWith(selectedMonth));
   const filteredExp = expenses.filter((e) => e.date.startsWith(selectedMonth));
+
+  // Performance breakdown
+  const gmvHariIni = performance.filter(p => p.date === todayStr).reduce((s, p) => s + p.gmv, 0);
+  const komisiRealHariIni = performance.filter(p => p.date === todayStr).reduce((s, p) => s + (p.commissionReal || 0), 0);
+  const komisiEstHariIni = performance.filter(p => p.date === todayStr).reduce((s, p) => s + (p.commissionEstimated || 0), 0);
+
+  const gmvKemarin = performance.filter(p => p.date === yesterdayStr).reduce((s, p) => s + p.gmv, 0);
+  const komisiRealKemarin = performance.filter(p => p.date === yesterdayStr).reduce((s, p) => s + (p.commissionReal || 0), 0);
+  const komisiEstKemarin = performance.filter(p => p.date === yesterdayStr).reduce((s, p) => s + (p.commissionEstimated || 0), 0);
 
   // Financial calculations
   const totalGmv = filteredPerf.reduce((sum, p) => sum + p.gmv, 0);
@@ -134,6 +146,73 @@ export const DashboardSharingPage: React.FC = () => {
           </div>
           <p className="text-xl font-black text-emerald-400 mt-2">{formatRupiah(labaBersihSharing)}</p>
           <span className="text-[10px] text-slate-400 font-medium">Sebelum Dibagi Dua</span>
+        </div>
+      </div>
+
+      {/* Daily Performance Breakdown (Hari Ini vs Kemarin) */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-purple-600" />
+            <span>Performa Harian & Komisi Sharing (WIB)</span>
+          </span>
+          <span className="text-[11px] text-slate-500 font-medium">
+            Zona Waktu: Asia/Jakarta (WIB)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+              <span>GMV HARI INI</span>
+              <span className="bg-slate-200 text-slate-700 px-1 rounded font-black">WIB</span>
+            </div>
+            <p className="text-base font-black text-slate-900 mt-1">{formatRupiah(gmvHariIni)}</p>
+            <span className="text-[10px] text-slate-400">Omset Hari Ini</span>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+              <span>GMV KEMARIN</span>
+              <span className="bg-slate-200 text-slate-700 px-1 rounded font-black">H-1</span>
+            </div>
+            <p className="text-base font-black text-slate-900 mt-1">{formatRupiah(gmvKemarin)}</p>
+            <span className="text-[10px] text-slate-400">Omset Kemarin</span>
+          </div>
+
+          <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200">
+            <div className="flex justify-between items-center text-[10px] font-bold text-emerald-800 uppercase">
+              <span>KOMISI REAL HARI INI</span>
+              <span className="bg-emerald-100 text-emerald-800 px-1 rounded font-black">REAL</span>
+            </div>
+            <p className="text-base font-black text-emerald-950 mt-1">
+              {komisiRealHariIni > 0 ? (
+                formatRupiah(komisiRealHariIni)
+              ) : komisiEstHariIni > 0 ? (
+                <span className="text-amber-800 font-bold">{formatRupiah(komisiEstHariIni)} <span className="text-[10px]">(Est)</span></span>
+              ) : (
+                <span className="text-xs font-bold text-slate-400">DATA KOMISI AKTUAL BELUM TERSEDIA</span>
+              )}
+            </p>
+            <span className="text-[10px] text-emerald-700">Komisi Hari Ini</span>
+          </div>
+
+          <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200">
+            <div className="flex justify-between items-center text-[10px] font-bold text-indigo-800 uppercase">
+              <span>KOMISI REAL KEMARIN</span>
+              <span className="bg-indigo-100 text-indigo-800 px-1 rounded font-black">REAL</span>
+            </div>
+            <p className="text-base font-black text-indigo-950 mt-1">
+              {komisiRealKemarin > 0 ? (
+                formatRupiah(komisiRealKemarin)
+              ) : komisiEstKemarin > 0 ? (
+                <span className="text-amber-800 font-bold">{formatRupiah(komisiEstKemarin)} <span className="text-[10px]">(Est)</span></span>
+              ) : (
+                <span className="text-xs font-bold text-slate-400">DATA KOMISI AKTUAL BELUM TERSEDIA</span>
+              )}
+            </p>
+            <span className="text-[10px] text-indigo-700">Komisi Kemarin</span>
+          </div>
         </div>
       </div>
 

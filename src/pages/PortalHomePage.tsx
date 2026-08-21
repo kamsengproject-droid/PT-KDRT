@@ -23,6 +23,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   User,
+  MapPin,
+  Edit3,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PtKdrtLogo } from '../components/PtKdrtLogo';
@@ -133,7 +135,14 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
       color: 'text-rose-600 bg-rose-50 border-rose-200',
       action: () => onNavigate('input-komisi-real'),
     },
-
+    {
+      id: 'input-manual',
+      title: 'INPUT MANUAL',
+      icon: Edit3,
+      desc: 'Input manual khusus Owner: Komisi Mingguan, Absensi Tim, & Komisi Karyawan.',
+      color: 'text-orange-600 bg-orange-50 border-orange-200',
+      action: () => onNavigate('input-manual'),
+    },
     {
       id: 'database-sampel',
       title: 'PRODUK SAMPEL',
@@ -141,6 +150,14 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
       desc: 'Database produk affiliate & pelacakan sampel lengkap.',
       color: 'text-purple-600 bg-purple-50 border-purple-200',
       action: () => onNavigate('database-sampel'),
+    },
+    {
+      id: 'penataan-lokasi',
+      title: 'PENATAAN LOKASI',
+      icon: MapPin,
+      desc: 'Manajemen lokasi rak & hanger sampel fisik studio dan cetak label.',
+      color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+      action: () => onNavigate('penataan-lokasi'),
     },
     {
       id: 'inventory',
@@ -252,6 +269,14 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
       action: () => onNavigate('database-sampel'),
     },
     {
+      id: 'penataan-lokasi',
+      title: 'PENATAAN LOKASI',
+      icon: MapPin,
+      desc: 'Manajemen lokasi rak & hanger sampel fisik studio.',
+      color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+      action: () => onNavigate('penataan-lokasi'),
+    },
+    {
       id: 'inventory',
       title: 'INVENTARIS & ASET',
       icon: Boxes,
@@ -326,6 +351,14 @@ export const PortalHomePage: React.FC<PortalHomePageProps> = ({ onNavigate }) =>
       desc: 'Daftar produk afiliasi dan request sampel.',
       color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
       action: () => onNavigate('database-sampel'),
+    },
+    {
+      id: 'penataan-lokasi',
+      title: 'PENATAAN LOKASI',
+      icon: MapPin,
+      desc: 'Cari posisi rak dan hanger sampel fisik studio.',
+      color: 'text-purple-600 bg-purple-50 border-purple-200',
+      action: () => onNavigate('penataan-lokasi'),
     },
   ];
 

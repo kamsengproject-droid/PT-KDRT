@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Camera,
   Clock,
   CheckCircle2,
   AlertTriangle,
   LogOut,
   XCircle,
   Loader2,
+  LogIn,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -20,7 +20,6 @@ import {
 } from '../services/settingsService';
 import { AttendanceRecord, Holiday, WorkplaceSchedule } from '../types';
 import { formatJam, tanggalHariIni, formatHariTanggal } from '../utils/formatters';
-import { CameraSelfieModal } from '../components/CameraSelfieModal';
 import { DEFAULT_SCHEDULE, getJadwalHari } from '../utils/attendanceCalc';
 
 interface NotificationState {
@@ -44,10 +43,6 @@ export const AbsensiEmployeePage: React.FC = () => {
   const [loadingAction, setLoadingAction] = useState<boolean>(false);
   const [loadingStatusText, setLoadingStatusText] = useState<string>('');
   const [notification, setNotification] = useState<NotificationState | null>(null);
-
-  // Modal Camera state
-  const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
-  const [attendanceMode, setAttendanceMode] = useState<'checkin' | 'checkout'>('checkin');
 
   // Determine active employee info
   const activeEmployeeId =
@@ -85,7 +80,9 @@ export const AbsensiEmployeePage: React.FC = () => {
     return unsub;
   }, [loading, currentUser?.uid, userProfile?.role, userProfile?.active, activeEmployeeId]);
 
-  const handleStartAbsenMasuk = () => {
+  const handleAbsenMasuk = async () => {
+    if (loadingAction) return; // Prevent double-click
+
     console.log('[ATTENDANCE_CLICK] ABSEN MASUK ditekan');
     console.log('[ATTENDANCE_DEBUG]', {
       firebaseUid: currentUser?.uid,
@@ -93,81 +90,35 @@ export const AbsensiEmployeePage: React.FC = () => {
       employeeName: activeEmployeeName,
       role: userProfile?.role,
     });
-    setNotification(null);
-    setAttendanceMode('checkin');
-    setIsCameraOpen(true);
-  };
 
-  const handleStartAbsenPulang = () => {
-    console.log('[ATTENDANCE_CLICK] ABSEN PULANG ditekan');
-    console.log('[ATTENDANCE_DEBUG]', {
-      firebaseUid: currentUser?.uid,
-      employeeId: activeEmployeeId,
-      employeeName: activeEmployeeName,
-      role: userProfile?.role,
-    });
-    setNotification(null);
-    setAttendanceMode('checkout');
-    setIsCameraOpen(true);
-  };
-
-  const todaySchedule = getJadwalHari(tanggalHariIni(), schedule);
-
-  const handleCapturePhoto = async (dataUrl: string) => {
     setLoadingAction(true);
-    setLoadingStatusText('Mengompres foto...');
+    setLoadingStatusText('MENYIMPAN ABSENSI...');
     setNotification(null);
 
     try {
-      if (attendanceMode === 'checkin') {
-        const result = await lakukanAbsenMasuk({
-          employeeId: activeEmployeeId,
-          employeeName: activeEmployeeName,
-          fotoBase64: dataUrl,
-          schedule,
-          holidays,
-          currentUserId: currentUser?.uid || userProfile?.uid || '',
-          currentUserName: activeEmployeeName,
-          onProgress: (stepMsg) => {
-            setLoadingStatusText(stepMsg);
-          },
-        });
+      const result = await lakukanAbsenMasuk({
+        employeeId: activeEmployeeId,
+        employeeName: activeEmployeeName,
+        schedule,
+        holidays,
+        currentUserId: currentUser?.uid || userProfile?.uid || '',
+        currentUserName: activeEmployeeName,
+        onProgress: (stepMsg) => {
+          setLoadingStatusText(stepMsg);
+        },
+      });
 
-        // Set state notification ONLY after Firestore write is confirmed
-        setNotification({
-          type: 'CHECKIN_SUCCESS',
-          title: 'BERHASIL CHECK-IN',
-          message: 'Absensi masuk berhasil dicatat.',
-          timeStr: result.waktuMasuk || formatJam(new Date()),
-          detail:
-            result.status === 'TERLAMBAT'
-              ? `Status: Terlambat ${result.menitTerlambat} menit (Jadwal: ${result.jadwalMasuk} WIB)`
-              : `Status: Tepat Waktu (${result.status})`,
-        });
-      } else {
-        const result = await lakukanAbsenPulang({
-          employeeId: activeEmployeeId,
-          employeeName: activeEmployeeName,
-          fotoBase64: dataUrl,
-          schedule,
-          currentUserId: currentUser?.uid || userProfile?.uid || '',
-          currentUserName: activeEmployeeName,
-          onProgress: (stepMsg) => {
-            setLoadingStatusText(stepMsg);
-          },
-        });
-
-        // Set state notification ONLY after Firestore write is confirmed
-        setNotification({
-          type: 'CHECKOUT_SUCCESS',
-          title: 'BERHASIL CHECK-OUT',
-          message: 'Absensi pulang berhasil dicatat.',
-          timeStr: result.waktuPulang || formatJam(new Date()),
-          detail: result.isEarlyCheckout
-            ? `Status: PULANG TERLALU CEPAT (${result.earlyCheckoutMinutes || 0}m sebelum batas normal)`
-            : 'Status: NORMAL (Tepat Waktu). Terima kasih atas kerja keras Anda hari ini.',
-        });
-      }
+      // Set state notification ONLY after Firestore write is confirmed
+      setNotification({
+        type: 'CHECKIN_SUCCESS',
+        title: 'ABSENSI BERHASIL DISIMPAN',
+        message: 'Absen masuk Anda telah tercatat ke sistem.',
+        timeStr: result.waktuMasuk || formatJam(new Date()),
+        detail:
+          result.status === 'TERLAMBAT'
+            ? `Status: Terlambat ${result.menitTerlambat} menit (Jadwal: ${result.jadwalMasuk} WIB)`
+            : `Status: Tepat Waktu (${result.status})`,
+      });
     } catch (err: any) {
       console.error('[ATTENDANCE_ERROR]', {
         code: err.code || 'UNKNOWN_ERROR',
@@ -183,6 +134,61 @@ export const AbsensiEmployeePage: React.FC = () => {
       setLoadingStatusText('');
     }
   };
+
+  const handleAbsenPulang = async () => {
+    if (loadingAction) return; // Prevent double-click
+
+    console.log('[ATTENDANCE_CLICK] ABSEN PULANG ditekan');
+    console.log('[ATTENDANCE_DEBUG]', {
+      firebaseUid: currentUser?.uid,
+      employeeId: activeEmployeeId,
+      employeeName: activeEmployeeName,
+      role: userProfile?.role,
+    });
+
+    setLoadingAction(true);
+    setLoadingStatusText('MENYIMPAN ABSENSI...');
+    setNotification(null);
+
+    try {
+      const result = await lakukanAbsenPulang({
+        employeeId: activeEmployeeId,
+        employeeName: activeEmployeeName,
+        schedule,
+        currentUserId: currentUser?.uid || userProfile?.uid || '',
+        currentUserName: activeEmployeeName,
+        onProgress: (stepMsg) => {
+          setLoadingStatusText(stepMsg);
+        },
+      });
+
+      // Set state notification ONLY after Firestore write is confirmed
+      setNotification({
+        type: 'CHECKOUT_SUCCESS',
+        title: 'ABSENSI BERHASIL DISIMPAN',
+        message: 'Absen pulang Anda telah tercatat ke sistem.',
+        timeStr: result.waktuPulang || formatJam(new Date()),
+        detail: result.isEarlyCheckout
+          ? `Status: PULANG TERLALU CEPAT (${result.earlyCheckoutMinutes || 0}m sebelum batas normal)`
+          : 'Status: NORMAL (Tepat Waktu). Terima kasih atas kerja keras Anda hari ini.',
+      });
+    } catch (err: any) {
+      console.error('[ATTENDANCE_ERROR]', {
+        code: err.code || 'UNKNOWN_ERROR',
+        message: err.message || String(err),
+      });
+      setNotification({
+        type: 'ERROR',
+        title: 'ABSENSI GAGAL',
+        message: err.message || 'Gagal menyimpan absensi. Silakan coba lagi.',
+      });
+    } finally {
+      setLoadingAction(false);
+      setLoadingStatusText('');
+    }
+  };
+
+  const todaySchedule = getJadwalHari(tanggalHariIni(), schedule);
 
   return (
     <div className="max-w-xl mx-auto space-y-5 pb-12">
@@ -249,7 +255,7 @@ export const AbsensiEmployeePage: React.FC = () => {
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-900 text-sm flex items-center gap-3 shadow-xs animate-pulse">
           <Loader2 className="h-5 w-5 text-blue-600 animate-spin shrink-0" />
           <div>
-            <span className="font-bold block">Sedang Memproses</span>
+            <span className="font-bold block">MENYIMPAN ABSENSI...</span>
             <span className="text-xs text-blue-700">{loadingStatusText || 'Menyimpan data absensi ke server...'}</span>
           </div>
         </div>
@@ -289,7 +295,7 @@ export const AbsensiEmployeePage: React.FC = () => {
           </div>
           <button
             onClick={() => setNotification(null)}
-            className="text-zinc-400 hover:text-zinc-700 p-1 -mr-1"
+            className="text-zinc-400 hover:text-zinc-700 p-1 -mr-1 cursor-pointer"
           >
             ×
           </button>
@@ -339,12 +345,16 @@ export const AbsensiEmployeePage: React.FC = () => {
         <div className="pt-2">
           {!todayRecord ? (
             <button
-              onClick={handleStartAbsenMasuk}
+              onClick={handleAbsenMasuk}
               disabled={loadingAction}
               className="w-full rounded-2xl bg-emerald-600 py-4 px-6 text-base sm:text-lg font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 cursor-pointer"
             >
-              <Camera className="h-6 w-6" />
-              <span>ABSEN MASUK</span>
+              {loadingAction ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <LogIn className="h-6 w-6" />
+              )}
+              <span>{loadingAction ? 'MENYIMPAN ABSENSI...' : 'ABSEN MASUK'}</span>
             </button>
           ) : !todayRecord.waktuPulang ? (
             <div className="space-y-4">
@@ -367,21 +377,25 @@ export const AbsensiEmployeePage: React.FC = () => {
                   <div className="pt-2 flex items-center gap-3">
                     <img
                       src={todayRecord.fotoMasuk}
-                      alt="Selfie Masuk"
+                      alt="Foto Masuk"
                       className="h-12 w-12 rounded-xl object-cover border border-zinc-200"
                     />
-                    <span className="text-zinc-500 text-[11px]">Foto selfie masuk terverifikasi</span>
+                    <span className="text-zinc-500 text-[11px]">Foto histori absensi</span>
                   </div>
                 )}
               </div>
 
               <button
-                onClick={handleStartAbsenPulang}
+                onClick={handleAbsenPulang}
                 disabled={loadingAction}
                 className="w-full rounded-2xl bg-blue-600 py-4 px-6 text-base sm:text-lg font-extrabold text-white shadow-xl shadow-blue-600/30 hover:bg-blue-500 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 cursor-pointer"
               >
-                <LogOut className="h-6 w-6" />
-                <span>ABSEN PULANG</span>
+                {loadingAction ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <LogOut className="h-6 w-6" />
+                )}
+                <span>{loadingAction ? 'MENYIMPAN ABSENSI...' : 'ABSEN PULANG'}</span>
               </button>
             </div>
           ) : (
@@ -410,18 +424,6 @@ export const AbsensiEmployeePage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Selfie Live Camera Modal */}
-      <CameraSelfieModal
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onCapture={handleCapturePhoto}
-        title={
-          attendanceMode === 'checkin'
-            ? 'Foto Selfie Absen Masuk'
-            : 'Foto Selfie Absen Pulang'
-        }
-      />
     </div>
   );
 };
