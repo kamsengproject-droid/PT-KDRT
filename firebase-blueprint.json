@@ -172,41 +172,6 @@
         "createdAt": { "type": "string" }
       },
       "required": ["settlementId", "investorName", "date", "amount", "status", "createdBy"]
-    },
-    "WeeklyCommission": {
-      "title": "WeeklyCommission",
-      "description": "Pencatatan komisi mingguan dari akun atau seller TikTok oleh Owner",
-      "type": "object",
-      "properties": {
-        "periodWeek": { "type": "string" },
-        "accountName": { "type": "string" },
-        "sellerName": { "type": "string" },
-        "amount": { "type": "number" },
-        "date": { "type": "string" },
-        "notes": { "type": "string" },
-        "transactionId": { "type": "string" },
-        "createdBy": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["periodWeek", "accountName", "amount", "date", "createdBy"]
-    },
-    "EmployeeCommission": {
-      "title": "EmployeeCommission",
-      "description": "Pencatatan komisi khusus karyawan berdasarkan performa/target oleh Owner",
-      "type": "object",
-      "properties": {
-        "employeeId": { "type": "string" },
-        "employeeName": { "type": "string" },
-        "period": { "type": "string" },
-        "amount": { "type": "number" },
-        "basis": { "type": "string" },
-        "notes": { "type": "string" },
-        "status": { "type": "string", "enum": ["BELUM DIBAYAR", "SUDAH DIBAYAR"] },
-        "paymentDate": { "type": "string" },
-        "createdBy": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["employeeId", "employeeName", "period", "amount", "basis", "status", "createdBy"]
     }
   },
   "firestore": {
@@ -217,14 +182,6 @@
     "/employees/{employeeId}": {
       "schema": "Employee",
       "description": "Koleksi file data karyawan"
-    },
-    "/weeklyCommissions/{commissionId}": {
-      "schema": "WeeklyCommission",
-      "description": "Koleksi komisi mingguan input manual Owner"
-    },
-    "/employeeCommissions/{empCommId}": {
-      "schema": "EmployeeCommission",
-      "description": "Koleksi komisi karyawan input manual Owner"
     },
     "/transactions/{transactionId}": {
       "schema": "FinancialTransaction",
