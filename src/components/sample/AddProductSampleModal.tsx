@@ -74,6 +74,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
 
   // FORM FIELDS
   const [productName, setProductName] = useState<string>('');
+  const [brandName, setBrandName] = useState<string>('');
   const [productImage, setProductImage] = useState<string>('');
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [category, setCategory] = useState<string>(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
@@ -107,6 +108,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
 
       // Clean Form Initial States
       setProductName('');
+      setBrandName('');
       setProductImage('');
       setSelectedPhotoFile(null);
       setCategory(canChooseScope ? 'Skincare & Kecantikan' : 'Fashion Kaos');
@@ -296,6 +298,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
       const samplePayload: Omit<AffiliateSample, 'id' | 'sampleId' | 'createdAt' | 'updatedAt'> = {
         productId: finalProductId,
         productName: productName.trim(),
+        brandName: brandName.trim(),
         productUrl: '',
         productImage: finalPhotoUrl || '',
         samplePrice: numericSamplePrice,
@@ -443,12 +446,26 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
               required
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              placeholder="Contoh: Skintific 5X Ceramide Barrier Moisture Gel 30g"
+              placeholder="Contoh: Kaos Oversized Mybasic"
               className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
+           {/* 2. NAMA Seller  */}
+<div>
+  <label className="block text-xs font-bold text-zinc-700 mb-1">
+    Nama Brand <span className="text-rose-500">*</span>
+  </label>
 
-          {/* 2. FOTO PRODUK */}
+  <input
+    type="text"
+    required
+    value={brandName}
+    onChange={(e) => setBrandName(e.target.value)}
+    placeholder="Contoh: MYBasic"
+    className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none"
+  />
+</div>
+          {/* 3. FOTO PRODUK */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-zinc-700">
               Foto Produk
@@ -635,24 +652,6 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
                 onChange={(e) => setReceivedDate(e.target.value)}
                 className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1">
-                PIC
-              </label>
-              <select
-                value={assignedEmployeeId}
-                onChange={(e) => setAssignedEmployeeId(e.target.value)}
-                className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:border-emerald-500 focus:outline-none"
-              >
-                <option value="">-- Pilih PIC --</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.position})
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div>
