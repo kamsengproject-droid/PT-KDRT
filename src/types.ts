@@ -368,6 +368,7 @@ export interface WorkplaceSchedule {
   timezone: string; // 'Asia/Jakarta'
   rajinWeeklyBonus?: number; // 150000
   lateDeduction?: number; // 20000
+  minRajinBonus?: number; // 0
   updatedAt?: any;
   updatedBy?: string;
 }

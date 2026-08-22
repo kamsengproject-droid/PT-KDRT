@@ -255,7 +255,7 @@ export function getChecklistStatus(
 export async function toggleChecklistAttendance(params: {
   employee: Employee;
   date: string; // YYYY-MM-DD
-  checkType: 'MASUK' | 'PULANG';
+  checkType: 'MASUK' | 'PULANG' | 'FULL_DAY';
   checked: boolean;
   currentUserId: string;
   currentUserName: string;
@@ -275,7 +275,10 @@ export async function toggleChecklistAttendance(params: {
     let nextHasMasuk = currentHasMasuk;
     let nextHasPulang = currentHasPulang;
 
-    if (checkType === 'MASUK') {
+    if (checkType === 'FULL_DAY') {
+      nextHasMasuk = checked;
+      nextHasPulang = checked;
+    } else if (checkType === 'MASUK') {
       nextHasMasuk = checked;
     } else {
       nextHasPulang = checked;
@@ -319,7 +322,7 @@ export async function toggleChecklistAttendance(params: {
         inStatus = (existingData.status as AttendanceStatus) || 'HADIR';
         menitTerlambat = existingData.menitTerlambat || existingData.lateMinutes || 0;
       } else {
-        // BUAT BARU DENGAN MEKANISME TIMESTAMP EXISTING (waktu aktual sistem)
+        // BUAT BARU DENGAN MEKANISME TIMESTAMP EXISTING (waktu jadwal atau aktual sistem)
         inTime = isToday ? currentRealTimeStr : daySched.checkInTime;
         inAt = nowTimestamp;
         const calc = hitungMenitTerlambat(inTime, daySched.checkInTime, 0);
@@ -346,7 +349,7 @@ export async function toggleChecklistAttendance(params: {
         isEarlyCheckout = existingData.isEarlyCheckout || false;
         earlyCheckoutMinutes = existingData.earlyCheckoutMinutes || 0;
       } else {
-        // BUAT BARU DENGAN MEKANISME TIMESTAMP EXISTING (waktu aktual sistem)
+        // BUAT BARU DENGAN MEKANISME TIMESTAMP EXISTING (waktu jadwal atau aktual sistem)
         outTime = isToday ? currentRealTimeStr : daySched.checkOutTime;
         outAt = nowTimestamp;
         const checkoutCalc = hitungStatusPulang(
@@ -363,7 +366,9 @@ export async function toggleChecklistAttendance(params: {
 
     // Consolidated Status
     let finalStatus: AttendanceStatus | 'BELUM ABSEN' = 'BELUM ABSEN';
-    if (nextHasMasuk) {
+    if (nextHasMasuk && nextHasPulang) {
+      finalStatus = inStatus === 'TERLAMBAT' ? 'TERLAMBAT' : 'HADIR';
+    } else if (nextHasMasuk) {
       finalStatus = inStatus; // 'HADIR' or 'TERLAMBAT'
     } else if (nextHasPulang) {
       finalStatus = 'BELUM LENGKAP';
@@ -418,14 +423,23 @@ export async function toggleChecklistAttendance(params: {
 export async function bulkChecklistAttendance(params: {
   employees: Employee[];
   date: string;
-  action: 'ALL_MASUK' | 'ALL_PULANG' | 'RESET_ALL';
+  action: 'ALL_FULL_DAY' | 'ALL_MASUK' | 'ALL_PULANG' | 'RESET_ALL';
   currentUserId: string;
   currentUserName: string;
 }) {
   const { employees, date, action, currentUserId, currentUserName } = params;
 
   for (const emp of employees) {
-    if (action === 'ALL_MASUK') {
+    if (action === 'ALL_FULL_DAY') {
+      await toggleChecklistAttendance({
+        employee: emp,
+        date,
+        checkType: 'FULL_DAY',
+        checked: true,
+        currentUserId,
+        currentUserName,
+      });
+    } else if (action === 'ALL_MASUK') {
       await toggleChecklistAttendance({
         employee: emp,
         date,

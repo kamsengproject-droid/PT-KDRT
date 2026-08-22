@@ -64,8 +64,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isEmployee = role === 'EMPLOYEE';
   const isInvestor = role === 'INVESTOR';
 
+  const isDesta =
+    (userProfile?.name || '').toLowerCase().includes('desta') ||
+    (employeeProfile?.name || '').toLowerCase().includes('desta') ||
+    (userProfile?.email || '').toLowerCase().includes('desta');
+
+  const isMelinda =
+    (userProfile?.name || '').toLowerCase().includes('melinda') ||
+    (employeeProfile?.name || '').toLowerCase().includes('melinda') ||
+    (userProfile?.email || '').toLowerCase().includes('melinda');
+
   const menuSections: MenuSection[] = [
-        // 1. Employee Specific Menu (Sederhana & Fokus)
+    // 1. Employee Specific Menu (Sederhana & Fokus)
     ...(isEmployee
       ? [
           {
@@ -87,18 +97,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   label: 'Produk Sampel',
                   icon: Package,
                 },
-                {
+                // BUG 7: Desta tidak melihat menu Penataan Sampel/Lokasi
+                ...(!isDesta ? [{
                   id: 'penataan-lokasi',
                   label: 'Penataan Lokasi',
                   icon: MapPin,
-                },
+                }] : []),
               ] : []),
-              ...(employeeProfile?.permissions?.canViewOmset ? [{
+              // BUG 5 & 6: Data Omset viewable by Melinda & Desta (or if permitted)
+              ...(isMelinda || isDesta || employeeProfile?.permissions?.canViewOmset ? [{
                 id: 'performa-harian',
                 label: 'Data Omset',
                 icon: TrendingUp,
               }] : []),
-              ...(employeeProfile?.permissions?.canInputCommissionReal ? [{
+              // BUG 6: Desta can input commission real / omzet. Melinda CANNOT (read-only).
+              ...((isDesta || employeeProfile?.permissions?.canInputCommissionReal) && !isMelinda ? [{
                 id: 'input-komisi-real',
                 label: 'Input Komisi Real',
                 icon: DollarSign,

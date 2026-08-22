@@ -287,7 +287,7 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
 
   const handleToggleAttendance = async (
     employee: Employee,
-    checkType: 'MASUK' | 'PULANG',
+    checkType: 'FULL_DAY' | 'MASUK' | 'PULANG',
     currentChecked: boolean
   ) => {
     const nextChecked = !currentChecked;
@@ -308,9 +308,11 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
     }
   };
 
-  const handleBulkAttendance = async (action: 'ALL_MASUK' | 'ALL_PULANG' | 'RESET_ALL') => {
+  const handleBulkAttendance = async (action: 'ALL_FULL_DAY' | 'ALL_MASUK' | 'ALL_PULANG' | 'RESET_ALL') => {
     const actionLabel =
-      action === 'ALL_MASUK'
+      action === 'ALL_FULL_DAY'
+        ? 'Tandai Semua Hadir Penuh (FULL DAY)'
+        : action === 'ALL_MASUK'
         ? 'Tandai Semua Hadir Masuk'
         : action === 'ALL_PULANG'
         ? 'Tandai Semua Hadir Pulang'
@@ -799,25 +801,17 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
               {/* Bulk Action Controls */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => handleBulkAttendance('ALL_MASUK')}
+                  onClick={() => handleBulkAttendance('ALL_FULL_DAY')}
                   disabled={isUpdatingAttendance !== null}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 text-xs font-bold transition"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition"
                 >
-                  <Check className="h-3.5 w-3.5" />
-                  <span>☑️ Centang Semua Masuk</span>
-                </button>
-                <button
-                  onClick={() => handleBulkAttendance('ALL_PULANG')}
-                  disabled={isUpdatingAttendance !== null}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 text-xs font-bold transition"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>☑️ Centang Semua Pulang</span>
+                  <Check className="h-4 w-4 stroke-[3]" />
+                  <span>☑️ CENTANG SEMUA FULL DAY</span>
                 </button>
                 <button
                   onClick={() => handleBulkAttendance('RESET_ALL')}
                   disabled={isUpdatingAttendance !== null}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 text-xs font-bold transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 text-xs font-bold transition"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>Reset</span>
@@ -829,10 +823,10 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-100">
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
                 <span className="text-[10px] font-extrabold uppercase text-emerald-800 tracking-wider">
-                  HADIR
+                  FULL DAY (HADIR)
                 </span>
                 <div className="text-lg font-black text-emerald-950 mt-0.5">
-                  {attendanceStats.hadir}{' '}
+                  {attendanceStats.hadir + attendanceStats.sudahPulang}{' '}
                   <span className="text-xs font-normal text-emerald-700">karyawan</span>
                 </div>
               </div>
@@ -874,10 +868,10 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
             <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  Checklist Absensi Harian Tim — Tanggal {formatTanggal(selectedAttendanceDate)}
+                  Checklist Uang Rajin / Kehadiran Tim — Tanggal {formatTanggal(selectedAttendanceDate)}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Konfirmasi absensi masuk dan pulang karyawan (Jam kerja sistem: 09:00–17:00 WIB).
+                  Satu centang Full Day = karyawan hadir penuh pada hari tersebut.
                 </p>
               </div>
 
@@ -907,8 +901,7 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
                   <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase text-[10px]">
                     <tr>
                       <th className="py-3 px-4">Karyawan</th>
-                      <th className="py-3 px-4 text-center">☑️ Absen Masuk</th>
-                      <th className="py-3 px-4 text-center">☑️ Absen Pulang</th>
+                      <th className="py-3 px-4 text-center">☑️ FULL DAY</th>
                       <th className="py-3 px-4 text-center">Status Kehadiran</th>
                       <th className="py-3 px-4">Waktu Tercatat</th>
                     </tr>
@@ -918,6 +911,7 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
                       const rec = attendanceMapForDate.get(emp.id!);
                       const hasMasuk = !!(rec?.waktuMasuk || rec?.checkInTime);
                       const hasPulang = !!(rec?.waktuPulang || rec?.checkOutTime);
+                      const isFullDay = hasMasuk;
                       const statusInfo = getChecklistStatus(hasMasuk, hasPulang, rec);
                       const isUpdatingThis =
                         isUpdatingAttendance?.startsWith(emp.id!) ||
@@ -939,54 +933,29 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
                             </div>
                           </td>
 
-                          {/* Checkbox Masuk */}
+                          {/* Checkbox FULL DAY */}
                           <td className="py-3.5 px-4 text-center">
-                            <label className="inline-flex items-center justify-center cursor-pointer select-none">
+                            <label className="inline-flex flex-col items-center justify-center cursor-pointer select-none">
                               <input
                                 type="checkbox"
-                                checked={hasMasuk}
+                                checked={isFullDay}
                                 disabled={isUpdatingThis}
-                                onChange={() => handleToggleAttendance(emp, 'MASUK', hasMasuk)}
+                                onChange={() => handleToggleAttendance(emp, 'FULL_DAY', isFullDay)}
                                 className="sr-only peer"
                               />
                               <div
-                                className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all ${
-                                  hasMasuk
+                                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                                  isFullDay
                                     ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
                                     : 'bg-slate-100 border-slate-300 text-transparent hover:border-slate-400'
                                 }`}
                               >
                                 <Check className="h-5 w-5 stroke-[3]" />
                               </div>
+                              <span className="text-[10px] font-bold text-slate-600 mt-1">
+                                {isFullDay ? 'Hadir Penuh' : 'Tidak Hadir'}
+                              </span>
                             </label>
-                            <div className="text-[10px] text-slate-500 font-mono mt-1">
-                              {hasMasuk ? rec?.waktuMasuk || rec?.checkInTime || 'Hadir' : '-'}
-                            </div>
-                          </td>
-
-                          {/* Checkbox Pulang */}
-                          <td className="py-3.5 px-4 text-center">
-                            <label className="inline-flex items-center justify-center cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={hasPulang}
-                                disabled={isUpdatingThis}
-                                onChange={() => handleToggleAttendance(emp, 'PULANG', hasPulang)}
-                                className="sr-only peer"
-                              />
-                              <div
-                                className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all ${
-                                  hasPulang
-                                    ? 'bg-blue-600 border-blue-700 text-white shadow-xs'
-                                    : 'bg-slate-100 border-slate-300 text-transparent hover:border-slate-400'
-                                }`}
-                              >
-                                <Check className="h-5 w-5 stroke-[3]" />
-                              </div>
-                            </label>
-                            <div className="text-[10px] text-slate-500 font-mono mt-1">
-                              {hasPulang ? rec?.waktuPulang || rec?.checkOutTime || 'Pulang' : '-'}
-                            </div>
                           </td>
 
                           {/* Status Kehadiran Badge */}
@@ -995,7 +964,7 @@ export const InputManualOwnerPage: React.FC<InputManualOwnerPageProps> = ({
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusInfo.badgeClass}`}
                             >
                               <span className={`h-1.5 w-1.5 rounded-full ${statusInfo.dotColor}`} />
-                              <span>{statusInfo.statusLabel}</span>
+                              <span>{isFullDay ? 'HADIR (FULL DAY)' : statusInfo.statusLabel}</span>
                             </span>
                           </td>
 

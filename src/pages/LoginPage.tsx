@@ -52,13 +52,19 @@ export const LoginPage: React.FC = () => {
         <div className="text-center mb-6 flex flex-col items-center">
           <div className="w-40 h-40 sm:w-48 sm:h-48 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/20 mb-3 bg-slate-950 flex items-center justify-center p-1.5 transition-all">
             <img
-              src="/assets/logo-kdrt-full.webp"
-              alt="PT.KDRT - Selamat Datang di Sistem Kamsengproject"
+              src="/assets/logo-kdrt.webp"
+              alt="PT. KAMSENG DIGITAL RAJA TERDEPAN"
               className="w-full h-full object-contain rounded-xl"
               referrerPolicy="no-referrer"
               onError={(e) => {
-                // Fallback to PNG if WebP is not supported
-                (e.currentTarget as HTMLImageElement).src = '/assets/logo-kdrt-full.png';
+                const target = e.currentTarget as HTMLImageElement;
+                if (!target.dataset.triedPng) {
+                  target.dataset.triedPng = 'true';
+                  target.src = '/assets/logo-kdrt.png';
+                } else if (!target.dataset.triedRoot) {
+                  target.dataset.triedRoot = 'true';
+                  target.src = '/logo-kdrt.png';
+                }
               }}
             />
           </div>

@@ -16,6 +16,7 @@ import {
   Building,
   User,
   ShieldCheck,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PtKdrtLogo } from '../PtKdrtLogo';
@@ -576,6 +577,134 @@ export const EmployeePortalDashboard: React.FC<EmployeePortalDashboardProps> = (
             </button>
           </div>
         </div>
+
+        {/* BUG 7: PENATAAN LOKASI (Hanya ditampilkan untuk Non-Desta) */}
+        {!((userProfile?.name || '').toLowerCase().includes('desta') || (employeeProfile?.name || '').toLowerCase().includes('desta') || (userProfile?.email || '').toLowerCase().includes('desta')) && (
+          <div
+            id="card-app-penataan-lokasi"
+            className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 shadow-2xs group-hover:scale-105 transition-transform">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-800">
+                  Rak & Hanger
+                </span>
+              </div>
+
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                PENATAAN LOKASI
+              </h3>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Cari & atur posisi rak dan hanger sampel fisik studio.
+              </p>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-slate-600">
+                Akses Modul
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate('penataan-lokasi')}
+                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors min-h-[44px] px-2 py-1"
+              >
+                <span>Buka Aplikasi</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* BUG 5 & BUG 6: DATA OMSET (Untuk Melinda / Desta / Employee yang diberi hak) */}
+        {((userProfile?.name || '').toLowerCase().includes('melinda') ||
+          (employeeProfile?.name || '').toLowerCase().includes('melinda') ||
+          (userProfile?.name || '').toLowerCase().includes('desta') ||
+          (employeeProfile?.name || '').toLowerCase().includes('desta') ||
+          employeeProfile?.permissions?.canViewOmset) && (
+          <div
+            id="card-app-data-omset"
+            className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-2xs group-hover:scale-105 transition-transform">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                  Read-Only Performa
+                </span>
+              </div>
+
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">
+                DATA OMSET & PERFORMA
+              </h3>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Pantau performa penjualan GMV dan komisi akun afiliasi secara berkala.
+              </p>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-slate-600">
+                Akses Modul
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate('performa-harian')}
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 group-hover:text-emerald-700 transition-colors min-h-[44px] px-2 py-1"
+              >
+                <span>Buka Aplikasi</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* BUG 6: INPUT KOMISI REAL (Khusus Desta / akun dengan hak input, DILARANG untuk Melinda) */}
+        {(((userProfile?.name || '').toLowerCase().includes('desta') ||
+          (employeeProfile?.name || '').toLowerCase().includes('desta') ||
+          employeeProfile?.permissions?.canInputCommissionReal) &&
+          !((userProfile?.name || '').toLowerCase().includes('melinda') ||
+            (employeeProfile?.name || '').toLowerCase().includes('melinda'))) && (
+          <div
+            id="card-app-input-komisi"
+            className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-rose-400 hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 shadow-2xs group-hover:scale-105 transition-transform">
+                  <DollarSign className="h-5 w-5" />
+                </div>
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
+                  Input Form
+                </span>
+              </div>
+
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-rose-600 transition-colors">
+                INPUT KOMISI REAL & OMSET
+              </h3>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Form pencatatan omset/GMV harian dan realisasi komisi akun TikTok afiliasi.
+              </p>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-slate-600">
+                Akses Modul
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate('input-komisi-real')}
+                className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 group-hover:text-rose-700 transition-colors min-h-[44px] px-2 py-1"
+              >
+                <span>Buka Aplikasi</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

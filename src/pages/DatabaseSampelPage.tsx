@@ -130,6 +130,8 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
   const [activeTab, setActiveTab] = useState<'SAMPEL' | 'MASTER_PRODUK'>(
     initialTab === 'PRODUK' || initialTab === 'MASTER_PRODUK' ? 'MASTER_PRODUK' : 'SAMPEL'
   );
+  // Mobile tab state for BUG 11: Fokus SAMPEL BARU & SAMPEL LAMA di mobile
+  const [mobileSampleTab, setMobileSampleTab] = useState<'BARU' | 'LAMA'>('BARU');
 
   // AI Screenshot Scan Modal state
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
@@ -951,21 +953,54 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
 
       {/* Main Content Area */}
       {activeTab === 'SAMPEL' ? (
-        /* ================= 2-COLUMN VIEW: SAMPEL BARU VS SAMPEL LAMA ================= */
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* KOLOM 1: SAMPEL BARU (PROSES TERBARU / BUTUH PERHATIAN) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-amber-50/70 border border-amber-200 rounded-2xl px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-amber-500 animate-pulse" />
-                <h2 className="font-black text-sm text-zinc-900 tracking-tight">
-                  {isEmployee ? 'PRODUK BELUM DIKONTENKAN' : 'SAMPEL BARU (PROSES BERJALAN)'}
-                </h2>
-              </div>
-              <span className="rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-black text-amber-900">
-                {newSamples.length} Item
+        <div className="space-y-4">
+          {/* Mobile Tab Switcher for BUG 11: Hanya SAMPEL BARU & SAMPEL LAMA di mobile */}
+          <div className="flex lg:hidden items-center p-1 bg-zinc-100 rounded-2xl border border-zinc-200 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMobileSampleTab('BARU')}
+              className={`flex-1 py-2.5 px-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                mobileSampleTab === 'BARU'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900 bg-white/60'
+              }`}
+            >
+              <span>🟢 SAMPEL BARU</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mobileSampleTab === 'BARU' ? 'bg-amber-600 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                {newSamples.length}
               </span>
-            </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileSampleTab('LAMA')}
+              className={`flex-1 py-2.5 px-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                mobileSampleTab === 'LAMA'
+                  ? 'bg-zinc-800 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900 bg-white/60'
+              }`}
+            >
+              <span>📦 SAMPEL LAMA</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mobileSampleTab === 'LAMA' ? 'bg-zinc-700 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                {oldSamples.length}
+              </span>
+            </button>
+          </div>
+
+          {/* ================= 2-COLUMN VIEW: SAMPEL BARU VS SAMPEL LAMA ================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* KOLOM 1: SAMPEL BARU (PROSES TERBARU / BUTUH PERHATIAN) */}
+            <div className={`space-y-4 ${mobileSampleTab === 'LAMA' ? 'hidden lg:block' : 'block'}`}>
+              <div className="flex items-center justify-between bg-amber-50/70 border border-amber-200 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-amber-500 animate-pulse" />
+                  <h2 className="font-black text-sm text-zinc-900 tracking-tight">
+                    {isEmployee ? 'PRODUK BELUM DIKONTENKAN' : 'SAMPEL BARU (PROSES BERJALAN)'}
+                  </h2>
+                </div>
+                <span className="rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-black text-amber-900">
+                  {newSamples.length} Item
+                </span>
+              </div>
 
             {newSamples.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center text-xs text-zinc-400">
@@ -1132,7 +1167,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
           </div>
 
           {/* KOLOM 2: SAMPEL LAMA (RIWAYAT SELESAI / SELESAI TARGET) */}
-          <div className="space-y-4">
+          <div className={`space-y-4 ${mobileSampleTab === 'BARU' ? 'hidden lg:block' : 'block'}`}>
             <div className="flex items-center justify-between bg-zinc-100 border border-zinc-200 rounded-2xl px-4 py-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -1231,6 +1266,7 @@ export const DatabaseSampelPage: React.FC<DatabaseSampelPageProps> = ({
             )}
           </div>
         </div>
+      </div>
       ) : (
         /* ================= KATALOG MASTER PRODUK (products) ================= */
         <div className="space-y-4">

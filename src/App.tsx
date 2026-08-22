@@ -88,6 +88,14 @@ const MainLayout: React.FC = () => {
     // RESTRICTION UNTUK ROLE EMPLOYEE
     // ---------------------------------------------------------
     if (role === 'EMPLOYEE') {
+      const isDesta =
+        (userProfile?.name || '').toLowerCase().includes('desta') ||
+        (userProfile?.email || '').toLowerCase().includes('desta');
+
+      const isMelinda =
+        (userProfile?.name || '').toLowerCase().includes('melinda') ||
+        (userProfile?.email || '').toLowerCase().includes('melinda');
+
       const allowedForEmployee = [
         'portal',
         'absensi-karyawan',
@@ -96,11 +104,12 @@ const MainLayout: React.FC = () => {
         'profil-saya',
         'kerjaan-harian',
         'database-sampel',
-        'penataan-lokasi',
-        'lokasi-sampel',
+        ...(!isDesta ? ['penataan-lokasi', 'lokasi-sampel'] : []),
         'produk',
         'sampel',
-        'sampel-inventory'
+        'sampel-inventory',
+        'performa-harian', // Both Melinda & Desta can view omzet/performa
+        ...((isDesta || userProfile?.permissions?.canManageExpenses) && !isMelinda ? ['input-komisi-real'] : []) // Desta can input omzet & komisi
       ];
       if (!allowedForEmployee.includes(activeMenu)) {
         return (
@@ -172,13 +181,20 @@ const MainLayout: React.FC = () => {
       case 'performa-harian':
         return <PerformaHarianPage />;
       case 'input-komisi-real':
-        if (role !== 'OWNER' && role !== 'MANAGER') {
+        const isDestaUser =
+          (userProfile?.name || '').toLowerCase().includes('desta') ||
+          (userProfile?.email || '').toLowerCase().includes('desta');
+        const isMelindaUser =
+          (userProfile?.name || '').toLowerCase().includes('melinda') ||
+          (userProfile?.email || '').toLowerCase().includes('melinda');
+
+        if (role !== 'OWNER' && role !== 'MANAGER' && (!isDestaUser || isMelindaUser)) {
           return (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900">
               <Lock className="mx-auto h-10 w-10 text-rose-600 mb-2" />
               <h3 className="font-bold text-base">Akses Dibatasi</h3>
               <p className="text-xs text-rose-700 mt-1">
-                Input Komisi Real hanya dapat diakses oleh Owner atau Manager.
+                Input Komisi Real hanya dapat diakses oleh Owner, Manager, atau akun yang berwenang (Desta).
               </p>
             </div>
           );

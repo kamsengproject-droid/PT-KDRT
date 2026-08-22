@@ -97,8 +97,8 @@ export async function getEmployeeByUserId(userId: string): Promise<Employee | nu
             canViewSampleProducts: true,
             canCreateSampleProduct: true,
             canInputCommissionReal: false,
-            canViewOmset: false,
-            canViewSharingOmset: false,
+            canViewOmset: true,
+            canViewSharingOmset: true,
             canViewSpecificAccounts: []
           };
         } else {

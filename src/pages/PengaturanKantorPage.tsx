@@ -17,6 +17,9 @@ import {
   Home,
   Wifi,
   RefreshCw,
+  Award,
+  Sparkles,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -30,7 +33,7 @@ import {
   subscribeWorkplaceSchedule,
 } from '../services/settingsService';
 import { Holiday, WorkplaceSchedule, OfficeLocation, ProfitSharingTier, DEFAULT_PROFIT_SHARING_TIERS } from '../types';
-import { formatTanggal, tanggalHariIni } from '../utils/formatters';
+import { formatTanggal, tanggalHariIni, formatRupiah } from '../utils/formatters';
 import { subscribeProfitSharingTiers } from '../services/profitSharingService';
 import { TierConfigManager } from '../components/profitSharing/TierConfigManager';
 import { AuditLogPage } from './AuditLogPage';
@@ -224,6 +227,9 @@ export const PengaturanKantorPage: React.FC<{ onBackToPortal?: () => void }> = (
         saturdayCheckInTime: satIn,
         saturdayCheckOutTime: satOut,
         earlyCheckoutToleranceMinutes: tolerance,
+        rajinWeeklyBonus: Number(schedule.rajinWeeklyBonus !== undefined ? schedule.rajinWeeklyBonus : 150000),
+        lateDeduction: Number(schedule.lateDeduction !== undefined ? schedule.lateDeduction : 20000),
+        minRajinBonus: Number(schedule.minRajinBonus !== undefined ? schedule.minRajinBonus : 0),
       };
 
       await updateWorkplaceSchedule(
@@ -231,7 +237,7 @@ export const PengaturanKantorPage: React.FC<{ onBackToPortal?: () => void }> = (
         userProfile?.uid || 'owner',
         userProfile?.name || 'Owner'
       );
-      setSaveSuccess('Pengaturan jam kerja (Senin–Jumat & Sabtu) serta aturan jam pulang berhasil disimpan ke Firestore.');
+      setSaveSuccess('Pengaturan jam kerja, aturan jam pulang, dan konfigurasi Uang Rajin berhasil disimpan ke Firestore.');
     } catch (err: any) {
       setSaveError(err.message || 'Gagal menyimpan pengaturan kantor.');
     } finally {

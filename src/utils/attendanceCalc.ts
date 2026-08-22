@@ -24,6 +24,7 @@ export const DEFAULT_SCHEDULE: WorkplaceSchedule = {
   timezone: 'Asia/Jakarta',
   rajinWeeklyBonus: 150000,
   lateDeduction: 20000,
+  minRajinBonus: 0,
 };
 
 export interface DayScheduleDetail {
@@ -271,7 +272,7 @@ export function getMingguDalamBulan(bulanStr: string): {
   return Array.from(weeksMap.values());
 }
 
-// Hitung Uang Rajin Mingguan untuk seorang karyawan secara komprehensif
+// Hitung Uang Rajin Mingguan untuk seorang karyawan secara komprehensif (Configurable Owner)
 export function hitungUangRajinMingguan(
   attendanceRecords: AttendanceRecord[], // records for the employee in the week
   weekStart: string,
@@ -279,7 +280,8 @@ export function hitungUangRajinMingguan(
   holidays: Holiday[] = [],
   baseBonus: number = 150000,
   lateDeduction: number = 20000,
-  workDays: string[] = DEFAULT_SCHEDULE.workDays
+  workDays: string[] = DEFAULT_SCHEDULE.workDays,
+  minBonus: number = 0
 ): {
   baseBonus: number;
   eligibleWorkDays: number;
@@ -319,7 +321,7 @@ export function hitungUangRajinMingguan(
 
     const checkInTime = record?.waktuMasuk || record?.checkInTime;
     const checkOutTime = record?.waktuPulang || record?.checkOutTime;
-    const hasCheckIn = !!checkInTime;
+    const hasCheckIn = !!checkInTime || record?.status === 'HADIR' || record?.status === 'TERLAMBAT';
 
     let status: AttendanceStatus | 'TIDAK HADIR' | 'LIBUR' | 'BELUM ABSEN' = 'BELUM ABSEN';
     let menitTerlambat = 0;
@@ -341,14 +343,14 @@ export function hitungUangRajinMingguan(
         lateDays += 1;
         potongan = lateDeduction;
         status = 'TERLAMBAT';
-        keterangan = `Check-In ${checkInTime} WIB (Terlambat ${menitTerlambat} menit) → Potongan Rp${lateDeduction.toLocaleString('id-ID')}`;
+        keterangan = `Check-In ${checkInTime || 'Hadir'} (Terlambat ${menitTerlambat} menit) → Potongan Rp${lateDeduction.toLocaleString('id-ID')}`;
       } else {
         status = 'HADIR';
-        keterangan = `Check-In ${checkInTime} WIB (Tepat Waktu)`;
+        keterangan = `Check-In ${checkInTime || 'Hadir'} (Tepat Waktu / Full Day)`;
       }
 
       if (record.isEarlyCheckout || record.checkoutStatus === 'EARLY_CHECKOUT') {
-        keterangan += ` • Pulang cepat ${checkOutTime} WIB (-${record.earlyCheckoutMinutes || 0}m, tidak memotong Uang Rajin)`;
+        keterangan += ` • Pulang cepat ${checkOutTime || ''} WIB (-${record.earlyCheckoutMinutes || 0}m, tidak memotong Uang Rajin)`;
       }
     } else {
       status = 'TIDAK HADIR';
@@ -370,21 +372,23 @@ export function hitungUangRajinMingguan(
     };
   });
 
-  // Aturan PT.KDRT:
-  // 1. Kehadiran penuh wajib (semua eligibleWorkDays harus ada Check-In). Jika tidak penuh, Uang Rajin = Rp 0.
-  // 2. Terlambat memotong Rp 20.000 per hari keterlambatan. Minimum Rp 0.
+  // Aturan PT.KDRT (Configurable oleh Owner):
+  // 1. Kehadiran penuh wajib (semua eligibleWorkDays harus ada Check-In / Full Day). Jika tidak penuh, Uang Rajin = minBonus.
+  // 2. Terlambat memotong lateDeduction per kejadian keterlambatan.
+  // 3. Batas minimum pembayaran = minBonus (default Rp 0). Jika hasil negatif otomatis minBonus.
   const isFullAttendance = eligibleWorkDays > 0 && presentDays >= eligibleWorkDays;
-  let finalBonus = 0;
+  let finalBonus = minBonus;
   let totalDeduction = 0;
   let reason = '';
 
   if (!isFullAttendance) {
-    finalBonus = 0;
+    finalBonus = minBonus;
     totalDeduction = baseBonus;
     reason = `Tidak memenuhi kehadiran penuh minggu ini (Hadir ${presentDays}/${eligibleWorkDays} hari kerja).`;
   } else {
     totalDeduction = lateDays * lateDeduction;
-    finalBonus = Math.max(0, baseBonus - totalDeduction);
+    // Perhitungan dinamis: baseBonus - totalDeduction (batas minimum minBonus, default Rp 0)
+    finalBonus = Math.max(minBonus, baseBonus - totalDeduction);
     if (lateDays > 0) {
       reason = `Hadir penuh (${presentDays}/${eligibleWorkDays} hari), terlambat ${lateDays} kali (Potongan Rp${totalDeduction.toLocaleString('id-ID')}).`;
     } else {

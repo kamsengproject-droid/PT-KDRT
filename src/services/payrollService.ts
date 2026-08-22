@@ -107,14 +107,20 @@ export async function hitungDanSimpanBonusMingguan(
   const existingSnap = await getDoc(docRef);
   const isPaid = existingSnap.exists() && existingSnap.data().status === 'SUDAH DIBAYAR';
 
+  const baseBonus = schedule.rajinWeeklyBonus !== undefined ? Number(schedule.rajinWeeklyBonus) : 150000;
+  const lateDeduction = schedule.lateDeduction !== undefined ? Number(schedule.lateDeduction) : 20000;
+  const minBonus = schedule.minRajinBonus !== undefined ? Number(schedule.minRajinBonus) : 0;
+  const workDays = schedule.workDays || DEFAULT_SCHEDULE.workDays;
+
   const calc = hitungUangRajinMingguan(
     attendanceRecords,
     weekStart,
     weekEnd,
     holidays,
-    schedule.rajinWeeklyBonus || 150000,
-    schedule.lateDeduction || 20000,
-    schedule.workDays
+    baseBonus,
+    lateDeduction,
+    workDays,
+    minBonus
   );
 
   const bonusData: AttendanceBonusWeek = {
