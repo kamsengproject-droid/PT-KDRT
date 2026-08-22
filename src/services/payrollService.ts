@@ -211,14 +211,19 @@ export async function bayarUangRajin(
   const docRef = doc(db, 'attendanceBonuses', docId);
 
   // 1. Update status bonus
-  await updateDoc(docRef, {
+  await setDoc(
+  docRef,
+  {
+    ...bonus,
     status: 'SUDAH DIBAYAR',
     paidAt: serverTimestamp(),
     paidBy: currentUserId,
     paidByName: currentUserName,
     paymentDate: tanggalHariIni(),
     updatedAt: serverTimestamp(),
-  });
+  },
+  { merge: true }
+);
 
   // 2. Insert expense transaction into expenses collection
   await tambahPengeluaran(
@@ -572,13 +577,19 @@ export async function setujuiPayroll(
     if (record.status !== 'PAID') {
       const docId = record.id || `${record.employeeId}_${record.month}`;
       const docRef = doc(db, 'payroll', docId);
-      await updateDoc(docRef, {
-        status: 'APPROVED',
-        approvedAt: serverTimestamp(),
-        approvedBy: currentUserId,
-        approvedByName: currentUserName,
-        updatedAt: serverTimestamp(),
-      });
+
+      await setDoc(
+        docRef,
+        {
+          ...record,
+          status: 'APPROVED',
+          approvedAt: serverTimestamp(),
+          approvedBy: currentUserId,
+          approvedByName: currentUserName,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
     }
   }
 
@@ -587,9 +598,11 @@ export async function setujuiPayroll(
     currentUserName,
     'PAYROLL_APPROVED',
     `Payroll ${formatBulanTahun(month)}`,
-    `Owner menyetujui payroll untuk ${payrollRecords.length} karyawan.`
+    `Payroll disetujui untuk ${payrollRecords.length} karyawan.`
   );
 }
+
+
 
 // Bayar Payroll Karyawan & Integrasi Transaksi Keuangan (Anti Double-Payment)
 export async function bayarGaji(
