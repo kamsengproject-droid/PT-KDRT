@@ -221,7 +221,10 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
       setErrorMessage('Nama Produk wajib diisi.');
       return;
     }
-
+if (!brandName.trim()) {
+  setErrorMessage('Nama Brand wajib diisi.');
+  return;
+    }
     setIsSubmitting(true);
     try {
       let finalProductId = '';
@@ -321,7 +324,7 @@ export const AddProductSampleModal: React.FC<AddProductSampleModalProps> = ({
 
       const sampleId = await createSample(
         samplePayload,
-        false, // Do not auto record financial expense
+        true, // Do not auto record financial expense
         true,  // Auto create daily task for PIC talent
         currentUserId,
         currentUserName
