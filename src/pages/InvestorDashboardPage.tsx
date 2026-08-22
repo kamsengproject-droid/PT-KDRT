@@ -33,19 +33,18 @@ import { subscribeDailyPerformance } from '../services/performanceService';
 import { subscribeProducts } from '../services/productService';
 import { subscribeAccounts } from '../services/accountService';
 import { DailyPerformance, Product, Account } from '../types';
-import {
-  formatRupiah,
-  formatTanggal,
-  formatBulanTahun,
-  bulanHariIni,
-  tanggalHariIni,
-  tanggalKemarin,
-} from '../utils/formatters';
+import { tanggalHariIni } from '../utils/formatters';
 import {
   ProfitSharingSettlement,
   InvestorWithdrawal,
   FinancialTransaction,
 } from '../types';
+import {
+  formatRupiah,
+  formatTanggal,
+  formatBulanTahun,
+  bulanHariIni,
+} from '../utils/formatters';
 
 interface InvestorDashboardPageProps {
   onBackToPortal?: () => void;
@@ -165,49 +164,61 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
     }));
   }, [sharingTransactions, year, month]);
 
-  // Performance metrics for current month, today, and yesterday (WIB Asia/Jakarta)
+  // Performance metrics: daily GMV, estimated commission, and real commission.
+  // Menggunakan collection dailyPerformance existing, tanpa collection/field baru.
   const {
     gmvHariIni,
     komisiRealHariIni,
     komisiEstimasiHariIni,
-    gmvKemarin,
-    komisiRealKemarin,
-    komisiEstimasiKemarin,
     gmvBulanIni,
     komisiRealBulanIni,
     komisiEstimasiBulanIni,
+    dailyPerformanceRows,
   } = useMemo(() => {
     const today = tanggalHariIni();
-    const yesterday = tanggalKemarin();
     const periodPrefix = `${year}-${month.padStart(2, '0')}`;
-    
+
     let gHariIni = 0;
     let kRealHariIni = 0;
     let kEstHariIni = 0;
-
-    let gKemarin = 0;
-    let kRealKemarin = 0;
-    let kEstKemarin = 0;
-
     let gBulanIni = 0;
     let kRealBulanIni = 0;
     let kEstBulanIni = 0;
 
+    const grouped = new Map<string, {
+      date: string;
+      gmv: number;
+      estimatedCommission: number;
+      commissionReal: number;
+    }>();
+
     performances.forEach((p) => {
+      const gmv = Number(p.gmv) || 0;
+      const estimatedCommission = Number(p.estimatedCommission) || 0;
+      const realCommission = Number(p.commissionReal ?? p.realCommission) || 0;
+
       if (p.date === today) {
-        gHariIni += p.gmv || 0;
-        kRealHariIni += p.commissionReal || 0;
-        kEstHariIni += p.commissionEstimated || 0;
+        gHariIni += gmv;
+        kRealHariIni += realCommission;
+        kEstHariIni += estimatedCommission;
       }
-      if (p.date === yesterday) {
-        gKemarin += p.gmv || 0;
-        kRealKemarin += p.commissionReal || 0;
-        kEstKemarin += p.commissionEstimated || 0;
-      }
+
       if (p.date?.startsWith(periodPrefix)) {
-        gBulanIni += p.gmv || 0;
-        kRealBulanIni += p.commissionReal || 0;
-        kEstBulanIni += p.commissionEstimated || 0;
+        gBulanIni += gmv;
+        kRealBulanIni += realCommission;
+        kEstBulanIni += estimatedCommission;
+
+        const current = grouped.get(p.date) || {
+          date: p.date,
+          gmv: 0,
+          estimatedCommission: 0,
+          commissionReal: 0,
+        };
+
+        current.gmv += gmv;
+        current.estimatedCommission += estimatedCommission;
+        current.commissionReal += realCommission;
+        grouped.set(p.date, current);
       }
     });
 
@@ -215,30 +226,18 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
       gmvHariIni: gHariIni,
       komisiRealHariIni: kRealHariIni,
       komisiEstimasiHariIni: kEstHariIni,
-      gmvKemarin: gKemarin,
-      komisiRealKemarin: kRealKemarin,
-      komisiEstimasiKemarin: kEstKemarin,
       gmvBulanIni: gBulanIni,
       komisiRealBulanIni: kRealBulanIni,
       komisiEstimasiBulanIni: kEstBulanIni,
+      dailyPerformanceRows: Array.from(grouped.values()).sort((a, b) => b.date.localeCompare(a.date)),
     };
   }, [performances, year, month]);
 
-    // DEBUG LOG SEMENTARA
-  useEffect(() => {
-    if (userProfile?.role === 'INVESTOR') {
-      console.log('[INVESTOR_DEBUG]', {
-        'Firebase UID': currentUser?.uid,
-        'Role': userProfile?.role,
-        'Selected Period': `${year}-${month.padStart(2, '0')}`,
-        'Income Query Result Count': sharingTransactions.filter(t => t.type === 'INCOME').length,
-        'Expense Query Result Count': sharingTransactions.filter(t => t.type === 'EXPENSE').length,
-        'Performance Query Result Count': performances.length,
-        'Account Query Result Count': accounts.length,
-        'Investor Settlement Result Count': settlements.length
-      });
-    }
-  }, [currentUser?.uid, userProfile?.role, year, month, sharingTransactions, performances, accounts, settlements]);
+  const maxDailyGmv = useMemo(
+    () => Math.max(1, ...dailyPerformanceRows.map((row) => row.gmv)),
+    [dailyPerformanceRows]
+  );
+
 
   // All-time Cumulative Investor metrics
   const totalHakSemuaPeriode = useMemo(() => {
@@ -259,9 +258,9 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
   const handleExportCsv = () => {
     const headers = [
       'Periode',
-      'Uang Masuk Sharing (Rp)',
-      'Pengeluaran Sharing (Rp)',
-      'Hak Investor (45%)',
+      'Uang Masuk (Rp)',
+      'Uang Keluar (Rp)',
+      'Est. Hak Investor',
       'Telah Dibayar (Rp)',
       'Sisa Belum Diterima (Rp)',
       'Status Settlement',
@@ -286,7 +285,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Laporan_Investor_Sharing_PT_KDRT_${Date.now()}.csv`);
+    link.setAttribute('download', `Laporan_Investor_Sharing_PT_Kamseng_Digital_Raja_Terdepan_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -338,7 +337,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
             <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-blue-400/20 text-blue-200 border border-blue-400/30 uppercase tracking-wider">
               INVESTOR DASHBOARD • READ ONLY
             </span>
-            <span className="text-xs text-blue-200 font-medium">PT. KARYA DIGITAL RAKYAT TERPADU</span>
+            <span className="text-xs text-blue-200 font-medium">PT. KAMSENG DIGITAL RAJA TERDEPAN</span>
           </div>
           <h2 className="text-2xl font-black tracking-tight">
             Transparansi Keuangan Kategori Sharing
@@ -371,7 +370,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
           >
             <div className="flex items-center justify-between text-emerald-800">
               <span className="text-[11px] font-black uppercase tracking-wider">
-                UANG MASUK SHARING
+                UANG MASUK
               </span>
               <TrendingUp className="h-4 w-4 text-emerald-600" />
             </div>
@@ -389,7 +388,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
           >
             <div className="flex items-center justify-between text-rose-800">
               <span className="text-[11px] font-black uppercase tracking-wider">
-                PENGELUARAN SHARING
+                UANG KELUAR
               </span>
               <DollarSign className="h-4 w-4 text-rose-600" />
             </div>
@@ -404,7 +403,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
           <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 shadow-2xs">
             <div className="flex items-center justify-between text-blue-800">
               <span className="text-[11px] font-black uppercase tracking-wider">
-                HAK INVESTOR ({liveCalc.investorPercentage}%)
+                EST. HAK INVESTOR ({liveCalc.investorPercentage}%)
               </span>
               <PieChart className="h-4 w-4 text-blue-600" />
             </div>
@@ -444,109 +443,135 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
       )}
 
       {/* 1.5 Performance Metrics */}
-      <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-3">
-          <h3 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-purple-600" />
-            <span>Performa Penjualan & Komisi Sharing (WIB Asia/Jakarta)</span>
-          </h3>
-          <span className="text-[11px] font-semibold text-zinc-500">
-            Sumber Data: Catatan Kinerja Harian Terverifikasi
+      <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-zinc-500 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-600" />
+              Performa Penjualan & Komisi Sharing
+            </h3>
+            <p className="text-[11px] text-zinc-400 mt-1">Data harian lengkap berdasarkan laporan WIB Asia/Jakarta.</p>
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1">
+            {formatBulanTahun(selectedMonthStr)}
           </span>
         </div>
 
-        {/* Grid Harian & Bulanan: Fokus Kemarin (H-1) & Akumulasi Bulan Ini */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* 1. GMV Kemarin (WIB H-1) */}
-          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-slate-600 tracking-wider">
-                GMV KEMARIN
-              </span>
-              <span className="text-[9px] font-black bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">
-                H-1 WIB
-              </span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">GMV Hari Ini</span>
+            <span className="text-lg font-black text-slate-900 mt-1 block">{formatRupiah(gmvHariIni)}</span>
+          </div>
+          <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200">
+            <span className="text-[10px] font-bold uppercase text-emerald-700 block">Est. Komisi Hari Ini</span>
+            <span className="text-lg font-black text-emerald-950 mt-1 block">{formatRupiah(komisiEstimasiHariIni)}</span>
+          </div>
+          <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200">
+            <span className="text-[10px] font-bold uppercase text-blue-700 block">Komisi Real Hari Ini</span>
+            <span className="text-lg font-black text-blue-950 mt-1 block">{formatRupiah(komisiRealHariIni)}</span>
+          </div>
+          <div className="p-4 bg-indigo-50/70 rounded-xl border border-indigo-200">
+            <span className="text-[10px] font-bold uppercase text-indigo-700 block">GMV Bulan Ini</span>
+            <span className="text-lg font-black text-indigo-950 mt-1 block">{formatRupiah(gmvBulanIni)}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 rounded-xl border border-zinc-200 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Grafik GMV Harian</span>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Data per tanggal pada periode yang dipilih.</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-zinc-400 block">Est. Komisi Bulan</span>
+                <span className="text-sm font-black text-emerald-700">{formatRupiah(komisiEstimasiBulanIni)}</span>
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-slate-950 mt-1">
-              {formatRupiah(gmvKemarin)}
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">
-              Omset Penjualan Kemarin ({formatTanggal(tanggalKemarin())})
-            </span>
+
+            {dailyPerformanceRows.length > 0 ? (
+              <div className="flex items-end gap-2 h-48 overflow-x-auto pb-1">
+                {dailyPerformanceRows.slice().reverse().map((row) => {
+                  const height = Math.max(8, Math.round((row.gmv / maxDailyGmv) * 150));
+                  return (
+                    <div key={row.date} className="min-w-10 flex-1 h-full flex flex-col items-center justify-end gap-1">
+                      <span className="text-[8px] font-bold text-zinc-500 whitespace-nowrap">
+                        {formatRupiah(row.gmv).replace('Rp', '').trim()}
+                      </span>
+                      <div
+                        className="w-full max-w-8 rounded-t-md bg-blue-500 hover:bg-blue-600 transition-colors"
+                        style={{ height: `${height}px` }}
+                        title={`${row.date} | GMV ${formatRupiah(row.gmv)} | Est. ${formatRupiah(row.estimatedCommission)} | Real ${formatRupiah(row.commissionReal)}`}
+                      />
+                      <span className="text-[8px] font-bold text-zinc-400 whitespace-nowrap">
+                        {row.date.slice(8, 10)}/{row.date.slice(5, 7)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-xs text-zinc-400">
+                Belum ada data performa harian pada periode ini.
+              </div>
+            )}
           </div>
 
-          {/* 2. Komisi Real Kemarin (WIB H-1) */}
-          <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-emerald-800 tracking-wider">
-                KOMISI REAL KEMARIN
-              </span>
-              <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-200">
-                REAL H-1
-              </span>
+          <div className="rounded-xl border border-zinc-200 p-4">
+            <div className="mb-3">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Ringkasan Komisi</span>
             </div>
-            <div className="text-lg sm:text-xl font-black text-emerald-950 mt-1">
-              {komisiRealKemarin > 0 ? (
-                formatRupiah(komisiRealKemarin)
-              ) : (
-                <span className="text-xs font-bold text-amber-700 block leading-tight">
-                  DATA KOMISI AKTUAL BELUM TERSEDIA
-                </span>
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 border border-emerald-100">
+                <span className="text-[10px] font-bold text-emerald-700">Est. Komisi Bulan</span>
+                <span className="text-xs font-black text-emerald-900">{formatRupiah(komisiEstimasiBulanIni)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 border border-blue-100">
+                <span className="text-[10px] font-bold text-blue-700">Komisi Real Bulan</span>
+                <span className="text-xs font-black text-blue-900">{formatRupiah(komisiRealBulanIni)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 border border-indigo-100">
+                <span className="text-[10px] font-bold text-indigo-700">GMV Bulan</span>
+                <span className="text-xs font-black text-indigo-900">{formatRupiah(gmvBulanIni)}</span>
+              </div>
             </div>
-            <span className="text-[10px] text-emerald-700 font-medium">
-              {komisiRealKemarin > 0
-                ? `Komisi Sah Kemarin (${formatTanggal(tanggalKemarin())})`
-                : 'Data komisi aktual kemarin belum diinput'}
-            </span>
           </div>
+        </div>
 
-          {/* 3. GMV Bulan Ini */}
-          <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-blue-800 tracking-wider">
-                GMV BULAN INI
-              </span>
-              <span className="text-[9px] font-black bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
-                BULANAN
-              </span>
-            </div>
-            <div className="text-lg sm:text-xl font-black text-blue-950 mt-1">
-              {formatRupiah(gmvBulanIni)}
-            </div>
-            <span className="text-[10px] text-blue-700 font-medium">
-              Akumulasi Omset {formatBulanTahun(selectedMonthStr)}
-            </span>
+        <div className="mt-4 rounded-xl border border-zinc-200 overflow-hidden">
+          <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200">
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Detail Performa Harian</span>
           </div>
-
-          {/* 4. Komisi Real Bulan Ini */}
-          <div className="p-4 bg-indigo-50/80 rounded-2xl border border-indigo-200">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-indigo-800 tracking-wider">
-                KOMISI REAL BULAN INI
-              </span>
-              <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200">
-                AKUMULASI
-              </span>
-            </div>
-            <div className="text-lg sm:text-xl font-black text-indigo-950 mt-1">
-              {komisiRealBulanIni > 0 ? (
-                formatRupiah(komisiRealBulanIni)
-              ) : komisiEstimasiBulanIni > 0 ? (
-                <span className="text-amber-800 text-base font-bold">
-                  {formatRupiah(komisiEstimasiBulanIni)}{' '}
-                  <span className="text-[10px] font-medium text-amber-700">(Est)</span>
-                </span>
-              ) : (
-                <span className="text-xs font-bold text-zinc-400">DATA KOMISI AKTUAL BELUM TERSEDIA</span>
-              )}
-            </div>
-            <span className="text-[10px] text-indigo-700 font-medium">
-              Periode {formatBulanTahun(selectedMonthStr)}
-            </span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-white text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                <tr className="border-b border-zinc-200">
+                  <th className="px-4 py-3">Tanggal WIB</th>
+                  <th className="px-4 py-3">GMV</th>
+                  <th className="px-4 py-3">Est. Komisi</th>
+                  <th className="px-4 py-3">Komisi Real</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {dailyPerformanceRows.map((row) => (
+                  <tr key={row.date} className="hover:bg-zinc-50/70">
+                    <td className="px-4 py-3 font-bold text-zinc-900 whitespace-nowrap">{formatTanggal(row.date)}</td>
+                    <td className="px-4 py-3 font-black text-indigo-800">{formatRupiah(row.gmv)}</td>
+                    <td className="px-4 py-3 font-black text-emerald-700">{formatRupiah(row.estimatedCommission)}</td>
+                    <td className="px-4 py-3 font-black text-blue-800">{formatRupiah(row.commissionReal)}</td>
+                  </tr>
+                ))}
+                {dailyPerformanceRows.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-zinc-400">Belum ada data performa harian.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+
 
       {/* 1.6 Products & Accounts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -680,9 +705,9 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500">
                   <th className="py-3 px-4">Periode</th>
-                  <th className="py-3 px-4">Uang Masuk Sharing</th>
-                  <th className="py-3 px-4">Pengeluaran Sharing</th>
-                  <th className="py-3 px-4">Hak Investor (45%)</th>
+                  <th className="py-3 px-4">Uang Masuk</th>
+                  <th className="py-3 px-4">Uang Keluar</th>
+                  <th className="py-3 px-4">Est. Hak Investor</th>
                   <th className="py-3 px-4">Terbayar</th>
                   <th className="py-3 px-4">Sisa Belum Diterima</th>
                   <th className="py-3 px-4">Status</th>
@@ -843,7 +868,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
               <div>
                 <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
                   <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  SUMBER UANG MASUK SHARING
+                  SUMBER UANG MASUK
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
                   Detail pendapatan untuk periode {formatBulanTahun(selectedMonthStr)}
@@ -914,7 +939,7 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
               <div>
                 <h3 className="text-xl font-black text-rose-900 flex items-center gap-2">
                   <DollarSign className="h-6 w-6 text-rose-600" />
-                  RINCIAN UANG KELUAR SHARING
+                  RINCIAN UANG KELUAR
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">
                   Detail pengeluaran untuk periode {formatBulanTahun(selectedMonthStr)}
@@ -1022,14 +1047,14 @@ export const InvestorDashboardPage: React.FC<InvestorDashboardPageProps> = ({
 
             <div className="space-y-2 text-xs">
               <div className="flex justify-between p-2.5 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span className="font-bold text-emerald-900">Uang Masuk Sharing:</span>
+                <span className="font-bold text-emerald-900">Uang Masuk:</span>
                 <span className="font-black text-emerald-950">
                   {formatRupiah(selectedSettlementDetail.totalIncome)}
                 </span>
               </div>
 
               <div className="flex justify-between p-2.5 bg-rose-50 rounded-xl border border-rose-200">
-                <span className="font-bold text-rose-900">Pengeluaran Sharing:</span>
+                <span className="font-bold text-rose-900">Uang Keluar:</span>
                 <span className="font-black text-rose-950">
                   {formatRupiah(selectedSettlementDetail.totalExpense)}
                 </span>
